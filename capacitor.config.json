@@ -1,0 +1,9 @@
+{
+  "appId": "com.notizapp.app",
+  "appName": "NotizApp",
+  "webDir": "src",
+  "backgroundColor": "#16161e",
+  "android": {
+    "backgroundColor": "#16161e"
+  }
+}

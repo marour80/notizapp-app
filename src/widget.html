@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>NotizApp Widget</title>
+  <link rel="stylesheet" href="widget.css" />
+</head>
+<body>
+  <div class="widget">
+    <header class="w-head">
+      <span class="w-title"><span class="w-logo">✦</span> Notizen</span>
+      <div class="w-actions">
+        <button id="pinBtn" title="Anheften (immer im Vordergrund)">📌</button>
+        <button id="openBtn" title="Volle App öffnen">⤢</button>
+        <button id="closeBtn" title="Widget schließen">✕</button>
+      </div>
+    </header>
+
+    <div class="w-filter">
+      <button data-filter="open" class="active">Offen</button>
+      <button data-filter="all">Alle</button>
+      <button data-filter="done">Erledigt</button>
+    </div>
+
+    <ul id="wList" class="w-list"></ul>
+    <div id="wEmpty" class="w-empty hidden">Nichts hier ✨</div>
+
+    <div class="w-add">
+      <input id="wAddInput" type="text" placeholder="+ Schnell-Notiz… (Enter)" autocomplete="off" />
+    </div>
+  </div>
+
+  <script src="core/config.js"></script>
+  <script src="vendor/supabase.js"></script>
+  <script src="core/model.js"></script>
+  <script src="core/device.js"></script>
+  <script src="core/supabase.js"></script>
+  <script src="core/store.js"></script>
+  <script src="widget.js"></script>
+</body>
+</html>

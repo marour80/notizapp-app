@@ -1,0 +1,43 @@
+{
+  "name": "notizapp",
+  "version": "1.0.0",
+  "description": "Eine coole, einfache Notiz-App für Windows",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "web": "node tools/serve.js",
+    "deploy": "node tools/deploy-web.js",
+    "sync": "cap sync",
+    "android": "cap open android",
+    "icons": "@capacitor/assets generate --android"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "sharp": "^0.34.5"
+  },
+  "build": {
+    "appId": "com.notizapp.desktop",
+    "productName": "NotizApp",
+    "win": {
+      "target": "nsis"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*"
+    ]
+  },
+  "dependencies": {
+    "@capacitor-mlkit/barcode-scanning": "^8.1.0",
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/push-notifications": "^8.1.1",
+    "@supabase/supabase-js": "^2.107.0"
+  }
+}

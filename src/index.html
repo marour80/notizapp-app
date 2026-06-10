@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>NotizApp</title>
+  <meta name="theme-color" content="#16161e" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="NotizApp" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="scrim" class="scrim hidden"></div>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="logo">✦</span>
+        <span class="brand-name">NotizApp</span>
+      </div>
+
+      <button id="newNoteBtn" class="new-note-btn">
+        <span>+</span> Neue Notiz
+      </button>
+
+      <button id="joinBtn" class="join-btn" title="Geteilter Notiz beitreten">
+        ⮕ Beitreten
+      </button>
+
+      <div class="search-box">
+        <input id="searchInput" type="text" placeholder="Suchen…" autocomplete="off" />
+      </div>
+
+      <nav class="folders">
+        <div class="folders-head">
+          <span>Ordner</span>
+          <button id="newFolderBtn" title="Neuer Ordner">+</button>
+        </div>
+        <ul id="folderList"></ul>
+      </nav>
+
+      <div class="tags-section">
+        <div class="folders-head"><span>Tags</span></div>
+        <ul id="tagList" class="tag-cloud"></ul>
+      </div>
+
+      <button id="accountBtn" class="account-btn" title="Notizen sichern">🔒 Notizen sichern</button>
+      <button id="themeToggle" class="theme-toggle" title="Theme wechseln">🌙 Dark</button>
+    </aside>
+
+    <!-- Note list -->
+    <section class="note-list-panel">
+      <div class="list-header">
+        <button id="menuBtn" class="mobile-only icon-btn" title="Menü">☰</button>
+        <h2 id="listTitle">Alle Notizen</h2>
+        <span id="noteCount" class="count">0</span>
+      </div>
+      <div class="status-filter">
+        <button data-filter="all" class="active">Alle</button>
+        <button data-filter="todo"><span class="dot dot-todo"></span></button>
+        <button data-filter="doing"><span class="dot dot-doing"></span></button>
+        <button data-filter="done"><span class="dot dot-done"></span></button>
+      </div>
+      <ul id="noteList" class="note-list"></ul>
+      <div id="emptyList" class="empty-list hidden">Keine Notizen hier.<br/>Tippe auf <b>+</b> für deine erste Notiz!</div>
+    </section>
+
+    <button id="fabNew" class="fab" title="Neue Notiz" aria-label="Neue Notiz">+</button>
+
+    <!-- Editor -->
+    <main class="editor-panel">
+      <div id="editorEmpty" class="editor-empty">
+        <span class="big-logo">✦</span>
+        <p>Wähle eine Notiz oder erstelle eine neue.</p>
+      </div>
+
+      <div id="editor" class="editor hidden">
+        <div class="editor-toolbar">
+          <div class="toolbar-left">
+            <button id="backBtn" class="mobile-only" title="Zurück zur Liste">‹ Liste</button>
+            <button data-fmt="bold" title="Fett (Strg+B)"><b>B</b></button>
+            <button data-fmt="italic" title="Kursiv (Strg+I)"><i>I</i></button>
+            <button data-fmt="h1" title="Überschrift">H</button>
+            <button data-fmt="list" title="Liste">☰</button>
+            <button data-fmt="code" title="Code">&lt;/&gt;</button>
+            <button id="previewToggle" title="Vorschau">👁</button>
+          </div>
+          <div class="toolbar-right">
+            <button id="shareBtn" title="Teilen">🔗</button>
+            <button id="deleteBtn" class="danger" title="Löschen">🗑</button>
+          </div>
+        </div>
+
+        <input id="titleInput" class="title-input" type="text" placeholder="Titel…" />
+        <div class="badge-row">
+          <div id="sharedBadge" class="shared-badge hidden">🔗 Geteilt</div>
+          <div id="presenceRow" class="presence-row hidden"></div>
+        </div>
+
+        <div class="status-row">
+          <button class="status-opt" data-status="todo" title="Noch nicht angefangen">
+            <span class="dot dot-todo"></span> Noch nicht angefangen
+          </button>
+          <button class="status-opt" data-status="doing" title="In Bearbeitung">
+            <span class="dot dot-doing"></span> In Bearbeitung
+          </button>
+          <button class="status-opt" data-status="done" title="Geschafft">
+            <span class="dot dot-done"></span> Geschafft ✓
+          </button>
+          <span id="statusAuto" class="status-auto hidden">⛓ automatisch aus Teilaufgaben</span>
+        </div>
+
+        <div class="meta-row">
+          <select id="folderSelect" class="folder-select"></select>
+          <input id="tagsInput" class="tags-input" type="text" placeholder="Tags (Komma getrennt)…" />
+        </div>
+
+        <textarea id="bodyInput" class="body-input" placeholder="Schreib drauf los… (Markdown wird unterstützt)"></textarea>
+        <div id="preview" class="preview hidden"></div>
+
+        <div class="subtasks">
+          <div class="subtasks-head">
+            <span>Teilaufgaben <span id="subProgress" class="sub-progress"></span></span>
+          </div>
+          <ul id="subList" class="sub-list"></ul>
+          <div class="sub-add">
+            <span class="dot dot-todo"></span>
+            <input id="subAddInput" type="text" placeholder="Neue Teilaufgabe…" autocomplete="off" enterkeyhint="done" />
+            <button id="subAddBtn" class="sub-add-btn" title="Teilaufgabe hinzufügen" aria-label="Teilaufgabe hinzufügen">+</button>
+          </div>
+        </div>
+
+        <div class="editor-footer">
+          <span id="savedHint">Automatisch gespeichert</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Teilen-Dialog -->
+  <div id="shareModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" id="shareClose">✕</button>
+      <h2>🔗 Notiz teilen</h2>
+      <div id="shareBusy" class="modal-hint hidden">Einen Moment…</div>
+
+      <div id="shareUnshared">
+        <p class="modal-hint">Teile diese Notiz, damit andere sie live mitbearbeiten können – ganz ohne Konto.</p>
+        <button id="doShareBtn" class="primary-btn">Jetzt teilen</button>
+      </div>
+
+      <div id="shareShared" class="hidden">
+        <p class="modal-hint">Per Code, Link oder QR teilen. Jede Änderung erscheint sofort bei allen.</p>
+        <label>Code zum Vorlesen</label>
+        <div class="copy-row">
+          <input id="shareCode" readonly />
+          <button class="copy-btn" data-copy="shareCode">Kopieren</button>
+        </div>
+        <label>Link zum Senden</label>
+        <div class="copy-row">
+          <input id="shareLink" readonly />
+          <button class="copy-btn" data-copy="shareLink">Kopieren</button>
+        </div>
+        <label>QR-Code (mit dem Handy scannen)</label>
+        <div class="qr-wrap"><div id="shareQr"></div></div>
+        <button id="unshareBtn" class="danger-btn">Teilen beenden</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Beitreten-Dialog -->
+  <div id="joinModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" id="joinClose">✕</button>
+      <h2>⮕ Notiz beitreten</h2>
+      <p class="modal-hint">Gib den Code oder Link ein, den du bekommen hast.</p>
+      <input id="joinInput" class="join-field" type="text" placeholder="z. B. OTTER-734" autocomplete="off" />
+      <div id="joinError" class="join-error hidden">Code nicht gefunden – bitte prüfen.</div>
+      <button id="scanBtn" class="primary-btn hidden">📷 QR-Code scannen</button>
+      <button id="doJoinBtn" class="primary-btn">Beitreten</button>
+    </div>
+  </div>
+
+  <!-- Anmelde-/Sicherungs-Dialog -->
+  <div id="authModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" id="authClose">✕</button>
+      <h2 id="authTitle">🔒 Notizen sichern</h2>
+      <p class="modal-hint" id="authHint">
+        Sichere deine Notizen mit E-Mail + Passwort. So bleiben sie dauerhaft erhalten – auch nach
+        Neustart oder Neuinstallation – und sind auf allen deinen Geräten gleich.
+      </p>
+      <input id="authEmail" class="auth-field" type="email" placeholder="E-Mail" autocomplete="email" />
+      <input id="authPassword" class="auth-field" type="password" placeholder="Passwort (mind. 6 Zeichen)" autocomplete="current-password" />
+      <div id="authError" class="join-error hidden"></div>
+      <button id="authSubmit" class="primary-btn">Notizen sichern</button>
+      <div class="auth-switch">
+        <span id="authSwitchText">Schon ein Konto?</span>
+        <a id="authSwitchLink" href="#">Anmelden</a>
+      </div>
+      <div id="authSignedIn" class="hidden">
+        <p class="modal-hint" id="authSignedInText"></p>
+        <button id="authSignout" class="danger-btn">Abmelden</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="core/config.js"></script>
+  <script src="vendor/supabase.js"></script>
+  <script src="vendor/qrcode.js"></script>
+  <script src="core/model.js"></script>
+  <script src="core/device.js"></script>
+  <script src="core/supabase.js"></script>
+  <script src="core/native.js"></script>
+  <script src="core/store.js"></script>
+  <script src="renderer.js"></script>
+  <script>
+    // PWA: Service Worker nur im echten Web (http/https), nicht in Electron (file://).
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>
