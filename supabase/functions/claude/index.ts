@@ -67,18 +67,14 @@ async function generate(client: any, prompt: string, isVoice = false) {
     model: MODEL,
     max_tokens: 1024,
     system:
-      'Du erstellst kompakte, praktische To-do- bzw. Einkaufslisten auf Deutsch. ' +
-      'Gib eine kurze Titelzeile und 3–15 knappe Listenpunkte (nur die Sache, ohne Nummerierung, ohne Mengen außer sie sind wichtig).',
+      'Du wandelst die Eingabe in eine übersichtliche Liste auf Deutsch um: einen kurzen Titel und passende Teilaufgaben (3–20 knappe Punkte, ohne Nummerierung).\n' +
+      'Erkenne dabei selbst, was gemeint ist:\n' +
+      '• Nennt der Nutzer KONKRETE Dinge/Aufgaben (z. B. "Milch, Brot, Zahnarzt anrufen"), übernimm genau diese.\n' +
+      '• Nennt der Nutzer ein VORHABEN oder ZIEL (z. B. "Tiramisu backen", "Geburtstagsparty planen", "für 3 Tage packen"), ' +
+      'denk SELBST mit und erstelle die passende Liste — z. B. die nötigen Zutaten beim Kochen/Backen, oder die Schritte/Dinge beim Planen.\n' +
+      '• Mischt der Nutzer beides, kombiniere sinnvoll.',
     output_config: { format: { type: 'json_schema', schema } },
-    messages: [
-      {
-        role: 'user',
-        content: isVoice
-          ? 'Wandle diese gesprochene Notiz in eine übersichtliche Liste um (kurzer Titel + Teilaufgaben). ' +
-            'Übernimm ALLE genannten Aufgaben/Artikel als einzelne Punkte:\n\n' + prompt
-          : `Erstelle eine Liste für: ${prompt}`
-      }
-    ]
+    messages: [{ role: 'user', content: (isVoice ? 'Gesprochene Notiz: ' : '') + prompt }]
   });
   return JSON.parse(textFrom(res));
 }
