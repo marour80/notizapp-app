@@ -332,7 +332,7 @@
   // ---- KI (ruft die Edge Function "claude" auf; Schlüssel bleibt serverseitig) ----
   async function aiInvoke(mode, input) {
     const c = await ensureClient();
-    const { data, error } = await c.functions.invoke('claude', { body: { mode, input } });
+    const { data, error } = await c.functions.invoke('Claude', { body: { mode, input } });
     if (error) throw error;
     if (data && data.error) throw new Error(data.error);
     return data;
