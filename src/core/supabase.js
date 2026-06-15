@@ -337,10 +337,18 @@
     if (data && data.error) throw new Error(data.error);
     return data;
   }
+  async function aiVoice(formData) {
+    const c = await ensureClient();
+    const { data, error } = await c.functions.invoke('Claude', { body: formData });
+    if (error) throw error;
+    if (data && data.error) throw new Error(data.error);
+    return data;
+  }
   global.NZAI = {
     available: () => !!(global.NZ_CONFIG && global.NZ_CONFIG.AI),
     generate: (prompt) => aiInvoke('generate', prompt),
-    sort: (items) => aiInvoke('sort', { items })
+    sort: (items) => aiInvoke('sort', { items }),
+    voice: (formData) => aiVoice(formData)
   };
 
   // Einheitliche Teilen-Schnittstelle (nur mit Cloud verfügbar).

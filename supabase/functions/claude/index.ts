@@ -31,7 +31,29 @@ function textFrom(res: any): string {
   return (block && block.text) || '{}';
 }
 
-async function generate(client: any, prompt: string) {
+// Sprachnachricht -> Text via OpenAI (probiert mehrere Modelle, je nach Projekt-Zugriff)
+async function transcribe(file: any): Promise<string> {
+  const key = Deno.env.get('OPENAI_API_KEY');
+  if (!key) throw new Error('OPENAI_API_KEY fehlt (Secret in Supabase setzen).');
+  const models = ['whisper-1', 'gpt-4o-mini-transcribe'];
+  const errs: string[] = [];
+  for (const model of models) {
+    const fd = new FormData();
+    fd.append('file', file, file.name || 'audio.webm');
+    fd.append('model', model);
+    const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + key },
+      body: fd
+    });
+    const j = await r.json();
+    if (r.ok) return j.text || '';
+    errs.push(model + ' -> ' + ((j.error && j.error.message) || 'HTTP ' + r.status));
+  }
+  throw new Error('Transkription fehlgeschlagen: ' + errs.join('  ||  '));
+}
+
+async function generate(client: any, prompt: string, isVoice = false) {
   const schema = {
     type: 'object',
     additionalProperties: false,
@@ -48,7 +70,15 @@ async function generate(client: any, prompt: string) {
       'Du erstellst kompakte, praktische To-do- bzw. Einkaufslisten auf Deutsch. ' +
       'Gib eine kurze Titelzeile und 3–15 knappe Listenpunkte (nur die Sache, ohne Nummerierung, ohne Mengen außer sie sind wichtig).',
     output_config: { format: { type: 'json_schema', schema } },
-    messages: [{ role: 'user', content: `Erstelle eine Liste für: ${prompt}` }]
+    messages: [
+      {
+        role: 'user',
+        content: isVoice
+          ? 'Wandle diese gesprochene Notiz in eine übersichtliche Liste um (kurzer Titel + Teilaufgaben). ' +
+            'Übernimm ALLE genannten Aufgaben/Artikel als einzelne Punkte:\n\n' + prompt
+          : `Erstelle eine Liste für: ${prompt}`
+      }
+    ]
   });
   return JSON.parse(textFrom(res));
 }
@@ -89,11 +119,23 @@ async function sortItems(client: any, items: string[]) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
-    const { mode, input } = await req.json();
     const key = Deno.env.get('ANTHROPIC_API_KEY');
     if (!key) return json({ error: 'ANTHROPIC_API_KEY fehlt (Secret in Supabase setzen).' }, 500);
     const client = new Anthropic({ apiKey: key });
 
+    // Sprachnachricht (multipart/form-data mit "file") -> transkribieren + Liste erstellen
+    const ct = req.headers.get('content-type') || '';
+    if (ct.includes('multipart/form-data')) {
+      const form = await req.formData();
+      const file = form.get('file');
+      if (!file) return json({ error: 'Keine Audiodatei empfangen.' }, 400);
+      const transcript = await transcribe(file);
+      if (!transcript.trim()) return json({ error: 'Nichts verstanden – bitte nochmal aufnehmen.' }, 400);
+      const list = await generate(client, transcript, true);
+      return json({ ...list, transcript });
+    }
+
+    const { mode, input } = await req.json();
     if (mode === 'generate') return json(await generate(client, String(input || '')));
     if (mode === 'sort') return json(await sortItems(client, (input && input.items) || []));
     return json({ error: 'Unbekannter Modus' }, 400);

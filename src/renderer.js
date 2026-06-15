@@ -870,9 +870,90 @@ async function aiSort() {
   }
 }
 
+// ---- Sprachnotiz (aufnehmen -> Whisper -> KI-Liste) ----
+let mediaRecorder = null;
+let audioChunks = [];
+let voiceTimer = null;
+let voiceSeconds = 0;
+
+function micSupported() {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+}
+function showVoiceError(msg) {
+  $('voiceError').textContent = msg;
+  $('voiceError').classList.remove('hidden');
+}
+
+async function startVoice() {
+  if (!aiAvailable()) return;
+  $('voiceError').classList.add('hidden');
+  $('voiceProcessing').classList.add('hidden');
+  $('voiceRecording').classList.remove('hidden');
+  $('voiceTimer').textContent = '0:00';
+  $('voiceModal').classList.remove('hidden');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    const useWebm = window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/webm');
+    mediaRecorder = useWebm ? new MediaRecorder(stream, { mimeType: 'audio/webm' }) : new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size) audioChunks.push(e.data);
+    };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      await processVoice(new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' }));
+    };
+    mediaRecorder.start();
+    voiceSeconds = 0;
+    voiceTimer = setInterval(() => {
+      voiceSeconds++;
+      const m = Math.floor(voiceSeconds / 60);
+      const s = voiceSeconds % 60;
+      $('voiceTimer').textContent = m + ':' + String(s).padStart(2, '0');
+      if (voiceSeconds >= 120) stopVoice(); // Sicherheitslimit 2 Min
+    }, 1000);
+  } catch (e) {
+    $('voiceRecording').classList.add('hidden');
+    showVoiceError('Mikrofon nicht verfügbar oder abgelehnt.');
+  }
+}
+
+function stopVoice() {
+  if (voiceTimer) {
+    clearInterval(voiceTimer);
+    voiceTimer = null;
+  }
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+}
+
+function closeVoice() {
+  stopVoice();
+  $('voiceModal').classList.add('hidden');
+}
+
+async function processVoice(blob) {
+  $('voiceRecording').classList.add('hidden');
+  $('voiceProcessing').classList.remove('hidden');
+  try {
+    const t = blob.type || '';
+    const ext = /mp4|mpeg|m4a/.test(t) ? 'mp4' : /ogg/.test(t) ? 'ogg' : /wav/.test(t) ? 'wav' : 'webm';
+    const fd = new FormData();
+    fd.append('file', blob, 'audio.' + ext);
+    const res = await NZAI.voice(fd);
+    $('voiceModal').classList.add('hidden');
+    createNoteFromAI(res.title, res.items);
+  } catch (e) {
+    $('voiceProcessing').classList.add('hidden');
+    showVoiceError('Fehler: ' + (e.message || e));
+  }
+}
+
 // ---- Events ----
 $('newNoteBtn').onclick = newNote;
 $('fabNew').onclick = newNote;
+$('voiceBtn').onclick = startVoice;
+$('voiceStop').onclick = stopVoice;
+$('voiceClose').onclick = closeVoice;
 $('aiBtn').onclick = () => {
   $('aiInput').value = '';
   $('aiError').classList.add('hidden');
@@ -1027,6 +1108,7 @@ NZStore.ready.then(async () => {
   await updateAccountUI();
   if (window.NZAI && NZAI.available() && NZStore.kind === 'supabase') {
     $('aiBtn').classList.remove('hidden');
+    if (micSupported()) $('voiceBtn').classList.remove('hidden');
   }
   // Falls von iOS abgemeldet, aber E-Mail bekannt → freundlich zum Anmelden auffordern
   const remembered = window.NZAuth && NZAuth.lastEmail ? NZAuth.lastEmail() : null;

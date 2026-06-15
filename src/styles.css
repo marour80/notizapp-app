@@ -611,6 +611,37 @@ input, textarea, [contenteditable], .body-input, .preview {
 .ai-btn:active { transform: scale(0.98); }
 .ai-examples { font-size: 11.5px; color: var(--text-faint); margin-top: 14px; line-height: 1.5; text-align: center; }
 
+.voice-btn {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius);
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.voice-btn:hover { color: #ff5c72; border-color: #ff5c72; }
+
+#voiceRecording, #voiceProcessing { text-align: center; }
+.voice-pulse {
+  font-size: 48px;
+  margin: 8px 0 14px;
+  animation: voicePulse 1.3s ease-in-out infinite;
+}
+@keyframes voicePulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.18); opacity: 1; }
+}
+.voice-timer {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+  margin: 6px 0 16px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---- Geteilt-Abzeichen ---- */
 .card-share { color: var(--accent); font-size: 11px; }
 .badge-row { display: flex; align-items: center; gap: 10px; margin: 0 24px 10px; flex-wrap: wrap; }

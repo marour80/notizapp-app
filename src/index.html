@@ -36,6 +36,10 @@
         ✨ KI-Liste
       </button>
 
+      <button id="voiceBtn" class="voice-btn hidden" title="Sprachnotiz aufnehmen">
+        🎤 Sprachnotiz
+      </button>
+
       <div class="search-box">
         <input id="searchInput" type="text" placeholder="Suchen…" autocomplete="off" />
       </div>
@@ -212,6 +216,25 @@
         <p class="modal-hint" id="authSignedInText"></p>
         <button id="authSignout" class="danger-btn">Abmelden</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Sprachnotiz-Dialog -->
+  <div id="voiceModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" id="voiceClose">✕</button>
+      <h2>🎤 Sprachnotiz</h2>
+      <div id="voiceRecording">
+        <div class="voice-pulse">🎙️</div>
+        <p class="modal-hint">Sprich deine Liste ein – z. B. „Ich muss Milch, Brot und Eier kaufen und den Müll rausbringen."</p>
+        <p class="voice-timer" id="voiceTimer">0:00</p>
+        <button id="voiceStop" class="primary-btn">⏹ Fertig &amp; Liste erstellen</button>
+      </div>
+      <div id="voiceProcessing" class="hidden">
+        <div class="voice-pulse">✨</div>
+        <p class="modal-hint">Transkribiere &amp; erstelle Liste…</p>
+      </div>
+      <div id="voiceError" class="join-error hidden"></div>
     </div>
   </div>
 
