@@ -473,6 +473,9 @@ input, textarea, [contenteditable], .body-input, .preview {
   overflow: hidden;
 }
 .subtasks-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -480,6 +483,21 @@ input, textarea, [contenteditable], .body-input, .preview {
   font-weight: 600;
   margin-bottom: 8px;
 }
+.sort-btn {
+  background: var(--accent-soft);
+  border: none;
+  color: var(--accent);
+  border-radius: 14px;
+  padding: 4px 11px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  transition: filter 0.15s;
+}
+.sort-btn:hover { filter: brightness(1.1); }
+.sort-btn:disabled { opacity: 0.5; cursor: default; }
 .sub-progress {
   text-transform: none;
   letter-spacing: 0;
@@ -577,6 +595,21 @@ input, textarea, [contenteditable], .body-input, .preview {
   transition: all 0.15s;
 }
 .join-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+.ai-btn {
+  background: linear-gradient(135deg, #7c6cff, #a855f7);
+  border: none;
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.05s;
+}
+.ai-btn:hover { filter: brightness(1.1); }
+.ai-btn:active { transform: scale(0.98); }
+.ai-examples { font-size: 11.5px; color: var(--text-faint); margin-top: 14px; line-height: 1.5; text-align: center; }
 
 /* ---- Geteilt-Abzeichen ---- */
 .card-share { color: var(--accent); font-size: 11px; }

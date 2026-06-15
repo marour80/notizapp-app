@@ -359,6 +359,7 @@ function renderSubtasks() {
   applyAutoStatus(note);
   updateSubProgress(note);
   renderStatusRow(note.status || 'todo');
+  $('sortBtn').classList.toggle('hidden', !(aiAvailable() && note.subtasks.length >= 2));
 }
 
 function updateSubProgress(note) {
@@ -798,9 +799,95 @@ async function signOutAccount() {
   location.reload();
 }
 
+// ---- KI (Liste erstellen / Einkauf sortieren) ----
+function aiAvailable() {
+  return !!(window.NZAI && NZAI.available() && NZStore.kind === 'supabase');
+}
+
+function createNoteFromAI(title, items) {
+  const note = NZ.makeNote({
+    title: title || 'Neue Liste',
+    folder: currentFolder === '__all__' ? '' : currentFolder,
+    tags: currentTag ? [currentTag] : []
+  });
+  note.subtasks = (items || []).map((t) => NZ.makeSubtask(t, NZDevice.me()));
+  applyAutoStatus(note);
+  data.notes.unshift(note);
+  persist();
+  renderAll();
+  openNote(note.id);
+}
+
+async function aiGenerate() {
+  const prompt = $('aiInput').value.trim();
+  if (!prompt) return;
+  $('aiSubmit').disabled = true;
+  const oldT = $('aiSubmit').textContent;
+  $('aiSubmit').textContent = '✨ Erstelle…';
+  $('aiError').classList.add('hidden');
+  try {
+    const res = await NZAI.generate(prompt);
+    $('aiModal').classList.add('hidden');
+    createNoteFromAI(res.title, res.items);
+  } catch (e) {
+    $('aiError').textContent = 'Fehler: ' + (e.message || e);
+    $('aiError').classList.remove('hidden');
+  } finally {
+    $('aiSubmit').disabled = false;
+    $('aiSubmit').textContent = oldT;
+  }
+}
+
+async function aiSort() {
+  const note = currentNote();
+  if (!note || !(note.subtasks || []).length) return;
+  const btn = $('sortBtn');
+  btn.disabled = true;
+  const oldT = btn.textContent;
+  btn.textContent = '✨ …';
+  try {
+    const res = await NZAI.sort(note.subtasks.map((s) => s.text));
+    const norm = (s) => (s || '').trim().toLowerCase();
+    const pool = note.subtasks.slice();
+    const reordered = [];
+    (res.groups || []).forEach((g) =>
+      (g.items || []).forEach((t) => {
+        const i = pool.findIndex((s) => norm(s.text) === norm(t));
+        if (i >= 0) reordered.push(pool.splice(i, 1)[0]);
+      })
+    );
+    reordered.push(...pool); // nicht zugeordnete bleiben am Ende
+    note.subtasks = reordered;
+    note.updatedAt = Date.now();
+    persist();
+    renderSubtasks();
+    renderNoteList();
+  } catch (e) {
+    alert('Sortieren fehlgeschlagen: ' + (e.message || e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldT;
+  }
+}
+
 // ---- Events ----
 $('newNoteBtn').onclick = newNote;
 $('fabNew').onclick = newNote;
+$('aiBtn').onclick = () => {
+  $('aiInput').value = '';
+  $('aiError').classList.add('hidden');
+  $('aiModal').classList.remove('hidden');
+  setTimeout(() => $('aiInput').focus(), 50);
+};
+$('aiClose').onclick = () => $('aiModal').classList.add('hidden');
+$('aiSubmit').onclick = aiGenerate;
+$('aiInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') aiGenerate();
+});
+$('sortBtn').onclick = aiSort;
+$('aiModal').addEventListener('click', (e) => {
+  if (e.target === $('aiModal')) $('aiModal').classList.add('hidden');
+});
 $('newFolderBtn').onclick = newFolder;
 $('deleteBtn').onclick = deleteNote;
 $('previewToggle').onclick = togglePreview;
@@ -938,6 +1025,9 @@ $('authModal').addEventListener('click', (e) => {
 });
 NZStore.ready.then(async () => {
   await updateAccountUI();
+  if (window.NZAI && NZAI.available() && NZStore.kind === 'supabase') {
+    $('aiBtn').classList.remove('hidden');
+  }
   // Falls von iOS abgemeldet, aber E-Mail bekannt → freundlich zum Anmelden auffordern
   const remembered = window.NZAuth && NZAuth.lastEmail ? NZAuth.lastEmail() : null;
   if (authAvailable() && !$('accountBtn')._secured && remembered) {

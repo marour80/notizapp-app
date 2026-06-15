@@ -32,6 +32,10 @@
         ⮕ Beitreten
       </button>
 
+      <button id="aiBtn" class="ai-btn hidden" title="Liste aus einem Satz erstellen">
+        ✨ KI-Liste
+      </button>
+
       <div class="search-box">
         <input id="searchInput" type="text" placeholder="Suchen…" autocomplete="off" />
       </div>
@@ -126,6 +130,7 @@
         <div class="subtasks">
           <div class="subtasks-head">
             <span>Teilaufgaben <span id="subProgress" class="sub-progress"></span></span>
+            <button id="sortBtn" class="sort-btn hidden" title="Einkauf nach Bereichen sortieren">✨ Sortieren</button>
           </div>
           <ul id="subList" class="sub-list"></ul>
           <div class="sub-add">
@@ -206,6 +211,21 @@
       <div id="authSignedIn" class="hidden">
         <p class="modal-hint" id="authSignedInText"></p>
         <button id="authSignout" class="danger-btn">Abmelden</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KI-Liste-Dialog -->
+  <div id="aiModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" id="aiClose">✕</button>
+      <h2>✨ Liste aus einem Satz</h2>
+      <p class="modal-hint">Beschreibe, was du brauchst – die KI erstellt eine fertige Liste mit Teilaufgaben.</p>
+      <input id="aiInput" class="auth-field" type="text" placeholder="z. B. Wocheneinkauf für 4 Personen" autocomplete="off" />
+      <div id="aiError" class="join-error hidden"></div>
+      <button id="aiSubmit" class="primary-btn">✨ Liste erstellen</button>
+      <div class="ai-examples">
+        Beispiele: „Packliste 3 Tage Berlin", „Putzplan WG", „Geburtstagsparty planen"
       </div>
     </div>
   </div>

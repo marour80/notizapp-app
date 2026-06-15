@@ -329,6 +329,20 @@
 
   global.NZAuth = { getAuthInfo, secureWithEmail, signInEmail, signOutUser, lastEmail };
 
+  // ---- KI (ruft die Edge Function "claude" auf; Schlüssel bleibt serverseitig) ----
+  async function aiInvoke(mode, input) {
+    const c = await ensureClient();
+    const { data, error } = await c.functions.invoke('claude', { body: { mode, input } });
+    if (error) throw error;
+    if (data && data.error) throw new Error(data.error);
+    return data;
+  }
+  global.NZAI = {
+    available: () => !!(global.NZ_CONFIG && global.NZ_CONFIG.AI),
+    generate: (prompt) => aiInvoke('generate', prompt),
+    sort: (items) => aiInvoke('sort', { items })
+  };
+
   // Einheitliche Teilen-Schnittstelle (nur mit Cloud verfügbar).
   global.NZShare = {
     available: () => true,
