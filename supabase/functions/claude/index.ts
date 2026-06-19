@@ -67,12 +67,15 @@ async function generate(client: any, prompt: string, isVoice = false) {
     model: MODEL,
     max_tokens: 1024,
     system:
-      'Du wandelst die Eingabe in eine übersichtliche Liste auf Deutsch um: einen kurzen Titel und passende Teilaufgaben (3–20 knappe Punkte, ohne Nummerierung).\n' +
+      'Du wandelst die Eingabe in eine übersichtliche Liste auf Deutsch um: einen kurzen Titel und passende Teilaufgaben (3–25 knappe Punkte, ohne Nummerierung).\n' +
       'Erkenne dabei selbst, was gemeint ist:\n' +
       '• Nennt der Nutzer KONKRETE Dinge/Aufgaben (z. B. "Milch, Brot, Zahnarzt anrufen"), übernimm genau diese.\n' +
       '• Nennt der Nutzer ein VORHABEN oder ZIEL (z. B. "Tiramisu backen", "Geburtstagsparty planen", "für 3 Tage packen"), ' +
       'denk SELBST mit und erstelle die passende Liste — z. B. die nötigen Zutaten beim Kochen/Backen, oder die Schritte/Dinge beim Planen.\n' +
-      '• Mischt der Nutzer beides, kombiniere sinnvoll.',
+      '• Mischt der Nutzer beides, kombiniere sinnvoll.\n' +
+      'WICHTIG bei Rezepten/Kochen/Backen: Gib zu JEDER Zutat eine sinnvolle MENGE an (z. B. "250 g Mascarpone", "3 Eier", "100 ml Espresso", "1 Pck. Löffelbiskuits").\n' +
+      'Berücksichtige genannte PORTIONEN / Personenzahl und SKALIERE die Mengen entsprechend (z. B. "für 8 Personen" → doppelte Mengen ggü. 4). ' +
+      'Ohne Angabe nimm eine übliche Menge (etwa 4 Portionen) und schreib die Portionszahl in den Titel (z. B. "Tiramisu (4 Portionen)").',
     output_config: { format: { type: 'json_schema', schema } },
     messages: [{ role: 'user', content: (isVoice ? 'Gesprochene Notiz: ' : '') + prompt }]
   });
