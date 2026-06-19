@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NotizApp – Datenschutzerklärung</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif; max-width: 760px; margin: 0 auto; padding: 28px 20px 60px; line-height: 1.6; color: #1c1c28; background: #f4f4f8; }
+    h1 { font-size: 26px; } h2 { font-size: 19px; margin-top: 28px; } a { color: #6a55ff; }
+    .muted { color: #5a5a6e; font-size: 14px; }
+    code { background: #ececf3; padding: 1px 6px; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Datenschutzerklärung – NotizApp</h1>
+  <p class="muted">Stand: Juni 2026</p>
+
+  <p>Diese App („NotizApp") ermöglicht das Erstellen, Speichern und Teilen von Notizen und Listen,
+  optional mit KI-Funktionen und Sprachnotizen. Der Schutz deiner Daten ist uns wichtig. Im Folgenden
+  erklären wir, welche Daten verarbeitet werden.</p>
+
+  <h2>1. Verantwortlicher</h2>
+  <p>Muhammed Arour<br />
+  Kontakt: <a href="mailto:muhammed.arour2006@gmail.com">muhammed.arour2006@gmail.com</a></p>
+
+  <h2>2. Welche Daten werden verarbeitet?</h2>
+  <ul>
+    <li><strong>Notizen &amp; Listen:</strong> Die von dir erstellten Inhalte werden in der Cloud (Supabase) gespeichert, damit sie auf deinen Geräten synchronisieren.</li>
+    <li><strong>Konto (optional):</strong> Wenn du deine Notizen sicherst, werden deine <strong>E-Mail-Adresse</strong> und ein Passwort gespeichert. Ohne Konto wird eine anonyme, geräteinterne Kennung verwendet.</li>
+    <li><strong>Sprachnotizen:</strong> Wenn du eine Sprachnotiz aufnimmst, wird die Audioaufnahme zur Umwandlung in Text an OpenAI gesendet. Die Audiodatei wird dabei <strong>nicht dauerhaft gespeichert</strong> – nur der erkannte Text wird zur Listenerstellung verwendet.</li>
+    <li><strong>KI-Listen:</strong> Dein eingegebener Text (bzw. der erkannte Sprachtext) wird zur Listenerstellung an Anthropic (Claude) übermittelt.</li>
+    <li><strong>Geteilte Notizen:</strong> Wenn du eine Notiz teilst, können andere Personen mit dem Code/Link diese Notiz sehen und bearbeiten. Dabei werden ein selbstgewählter Spitzname und eine Farbe angezeigt.</li>
+  </ul>
+
+  <h2>3. Eingesetzte Dienste (Auftragsverarbeiter)</h2>
+  <ul>
+    <li><strong>Supabase</strong> – Datenbank, Anmeldung und Synchronisation deiner Notizen.</li>
+    <li><strong>OpenAI</strong> – Umwandlung von Sprachaufnahmen in Text (nur bei Nutzung der Sprachnotiz).</li>
+    <li><strong>Anthropic (Claude)</strong> – Erstellung von Listen aus deinem Text (nur bei Nutzung der KI-Funktionen).</li>
+  </ul>
+  <p>Diese Dienste verarbeiten die übermittelten Daten ausschließlich zur Bereitstellung der jeweiligen Funktion.</p>
+
+  <h2>4. Berechtigungen</h2>
+  <ul>
+    <li><strong>Mikrofon:</strong> Wird nur verwendet, wenn du selbst eine Sprachnotiz aufnimmst.</li>
+    <li><strong>Internet:</strong> Für die Cloud-Synchronisation und KI-Funktionen.</li>
+  </ul>
+
+  <h2>5. Kein Tracking, keine Werbung</h2>
+  <p>Die App enthält <strong>keine Werbung</strong> und <strong>kein Analyse-/Tracking</strong> zu Werbezwecken.</p>
+
+  <h2>6. Speicherdauer &amp; Löschung</h2>
+  <p>Deine Notizen bleiben gespeichert, bis du sie löschst. Du kannst einzelne Notizen jederzeit in der App
+  entfernen. Wenn du dein Konto oder deine Daten vollständig löschen möchtest, schreib uns an die oben
+  genannte E-Mail-Adresse.</p>
+
+  <h2>7. Deine Rechte</h2>
+  <p>Du hast das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung deiner
+  personenbezogenen Daten. Wende dich dazu an die oben genannte Kontaktadresse.</p>
+
+  <h2>8. Änderungen</h2>
+  <p>Wir können diese Datenschutzerklärung anpassen, wenn sich Funktionen der App ändern. Die jeweils
+  aktuelle Version findest du unter dieser Adresse.</p>
+</body>
+</html>

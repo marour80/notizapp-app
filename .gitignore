@@ -17,6 +17,13 @@ ios/App/Pods/
 ios/App/build/
 ios/build/
 
+# Signatur-Schlüssel & Geheimnisse (NIEMALS committen!)
+*.keystore
+*.jks
+android/keystore.properties
+RELEASE-KEY-INFO.txt
+*.aab
+
 # System / Editor
 .DS_Store
 *.log
