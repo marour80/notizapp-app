@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16161e"/>
+      <stop offset="1" stop-color="#241f3d"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c6cff"/>
+      <stop offset="1" stop-color="#a855f7"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="500" fill="url(#bg)"/>
+
+  <!-- Logo-Kachel -->
+  <g transform="translate(120,170)">
+    <rect width="160" height="160" rx="36" fill="url(#accent)"/>
+    <path d="M80 34 L102 67 L135 80 L102 93 L80 126 L58 93 L25 80 L58 67 Z" fill="#ffffff"/>
+  </g>
+
+  <!-- Text -->
+  <text x="330" y="225" font-family="Segoe UI, Arial, sans-serif" font-size="78" font-weight="800" fill="#ffffff">NotizApp</text>
+  <text x="332" y="285" font-family="Segoe UI, Arial, sans-serif" font-size="32" font-weight="500" fill="#b9b4e6">Listen teilen · KI · Sprachnotizen</text>
+
+  <!-- kleine Farbpunkte (Status) -->
+  <circle cx="340" cy="340" r="11" fill="#ff5c72"/>
+  <circle cx="378" cy="340" r="11" fill="#ffb340"/>
+  <circle cx="416" cy="340" r="11" fill="#3ad17a"/>
+</svg>
