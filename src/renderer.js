@@ -1291,10 +1291,12 @@ async function signInWithProvider(which) {
   $('authError').classList.add('hidden');
   try {
     await (which === 'apple' ? NZAuth.signInWithApple() : NZAuth.signInWithGoogle());
-    // Web: Browser leitet weiter (Seite lädt neu zurück). Native: System-Browser offen,
-    // Rückkehr läuft über onAuthCallback → dort wird neu geladen.
+    // Web: Browser leitet weiter (Seite lädt neu zurück). Native: Browser ist nun offen,
+    // Rückkehr läuft über onAuthCallback (Erfolg) → location.reload().
   } catch (e) {
     showAuthError(t('oauthFailed') + (e.message || e));
+  } finally {
+    // Knopf wieder freigeben: bei Erfolg lädt die Seite eh neu, bei Abbruch bleibt er klickbar.
     btn.disabled = false;
   }
 }
