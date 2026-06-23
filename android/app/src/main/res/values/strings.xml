@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">SmartNote</string>
     <string name="title_activity_main">SmartNote</string>
-    <string name="package_name">com.smartnote.app</string>
-    <string name="custom_url_scheme">com.smartnote.app</string>
+    <string name="package_name">com.getsmartnote.app</string>
+    <string name="custom_url_scheme">com.getsmartnote.app</string>
 </resources>

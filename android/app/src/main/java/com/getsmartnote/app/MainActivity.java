@@ -1,4 +1,4 @@
-package com.smartnote.app;
+package com.getsmartnote.app;
 
 import com.getcapacitor.BridgeActivity;
 

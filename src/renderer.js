@@ -1549,6 +1549,7 @@ async function processVoice(blob) {
 $('newNoteBtn').onclick = newNote;
 $('fabNew').onclick = newNote;
 $('voiceBtn').onclick = () => startVoice(null);
+$('fabVoice').onclick = () => startVoice(null);
 $('editVoiceBtn').onclick = () => startVoice(activeNoteId);
 $('voiceStop').onclick = stopVoice;
 $('voiceClose').onclick = closeVoice;
@@ -1742,9 +1743,12 @@ $('usernameInput').addEventListener('keydown', (e) => {
 NZStore.ready.then(async () => {
   await updateAccountUI();
   if (window.NZAI && NZAI.available() && NZStore.kind === 'supabase') {
-    if (micSupported()) {
+    // Auf iOS meldet die WebView micSupported() oft false, kann aber trotzdem aufnehmen
+    // (mit Mikrofon-Berechtigung) → auf nativen Geräten den Knopf zeigen.
+    if (micSupported() || (window.NZNative && NZNative.isNative())) {
       $('voiceBtn').classList.remove('hidden');
       $('editVoiceBtn').classList.remove('hidden');
+      $('fabVoice').classList.remove('hidden');
     }
   }
   if (NZStore.kind === 'supabase' && window.NZFriends) $('friendsBtn').classList.remove('hidden');

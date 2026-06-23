@@ -1080,6 +1080,16 @@ input, textarea, [contenteditable], .body-input, .preview {
 }
 .fab:hover { filter: brightness(1.1); }
 .fab:active { transform: scale(0.92); }
+.fab-voice {
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  width: 52px;
+  height: 52px;
+  font-size: 24px;
+  background: var(--bg-3);
+  color: var(--accent);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.fab-voice.hidden { display: none !important; }
 
 @media (max-width: 760px) {
   .app { grid-template-columns: 1fr; }
