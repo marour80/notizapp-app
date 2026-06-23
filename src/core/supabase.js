@@ -340,8 +340,9 @@
     });
     if (error) throw error;
     if (native && data && data.url) {
-      // System-Browser öffnen (Capacitor leitet _system an den echten Browser).
-      global.open(data.url, '_system');
+      // Browser öffnen (iOS: Capacitor-Browser-Plugin; Android: Custom Tab / System).
+      if (global.NZNative && NZNative.openUrl) await NZNative.openUrl(data.url);
+      else global.open(data.url, '_system');
     }
     return true;
   }

@@ -1302,6 +1302,7 @@ async function signInWithProvider(which) {
 // Native Rückleitung aus dem Browser (smartnote://login-callback) abschließen.
 if (window.NZNative && NZNative.onAuthCallback) {
   NZNative.onAuthCallback(async (url) => {
+    if (NZNative.closeBrowser) NZNative.closeBrowser(); // In-App-Safari schließen
     try {
       const ok = await NZAuth.completeOAuth(url);
       if (ok) location.reload(); // mit dem neuen Konto laden

@@ -82,6 +82,30 @@
     return list.length ? list[0].rawValue || list[0].displayValue || '' : '';
   }
 
+  // ---- Externen Browser öffnen (für OAuth-Login) ----
+  // iOS: window.open('_system') öffnet nichts → Capacitor-Browser-Plugin nutzen.
+  async function openUrl(url) {
+    const B = plugin('Browser');
+    if (B && B.open) {
+      try {
+        await B.open({ url });
+        return true;
+      } catch {}
+    }
+    try {
+      global.open(url, '_system');
+    } catch {}
+    return false;
+  }
+  async function closeBrowser() {
+    const B = plugin('Browser');
+    if (B && B.close) {
+      try {
+        await B.close();
+      } catch {}
+    }
+  }
+
   // ---- Kamera / Foto ----
   function cameraAvailable() {
     return !!plugin('Camera');
@@ -121,5 +145,5 @@
     return true;
   }
 
-  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, registerPush, parseCode, plugin };
+  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, registerPush, parseCode, plugin };
 })(typeof window !== 'undefined' ? window : globalThis);
