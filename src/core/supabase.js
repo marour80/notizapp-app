@@ -67,7 +67,13 @@
     client =
       client ||
       global.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-        auth: { persistSession: true, autoRefreshToken: true, storage: localStorage }
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          storage: localStorage,
+          flowType: 'pkce', // OAuth (Google/Apple) liefert einen Code zum Eintauschen
+          detectSessionInUrl: true // Web: Login-Rückleitung automatisch verarbeiten
+        }
       });
 
     let { data: sess } = await client.auth.getSession();
@@ -320,6 +326,57 @@
     await c.auth.signInAnonymously(); // neue anonyme Identität, App läuft weiter
   }
 
+  // ---- Anmelden mit Google / Apple (OAuth) ----
+  // Web/PWA: Browser leitet weiter und kommt automatisch zurück (detectSessionInUrl).
+  // Native App: System-Browser öffnen, Rückkehr über smartnote://login-callback.
+  async function signInWithOAuthProvider(provider) {
+    const c = await ensureClient();
+    const native = !!(global.NZNative && NZNative.isNative());
+    const webBase = (cfg().WEB_URL) || (global.location && location.origin + location.pathname) || undefined;
+    const redirectTo = native ? 'smartnote://login-callback' : webBase;
+    const { data, error } = await c.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo, skipBrowserRedirect: native }
+    });
+    if (error) throw error;
+    if (native && data && data.url) {
+      // System-Browser öffnen (Capacitor leitet _system an den echten Browser).
+      global.open(data.url, '_system');
+    }
+    return true;
+  }
+  function signInWithGoogle() {
+    return signInWithOAuthProvider('google');
+  }
+  function signInWithApple() {
+    return signInWithOAuthProvider('apple');
+  }
+
+  // Native Rückleitung smartnote://login-callback?code=… → Session herstellen.
+  async function completeOAuth(url) {
+    const c = await ensureClient();
+    let code = null;
+    let hashParams = null;
+    try {
+      const u = new URL(url);
+      code = u.searchParams.get('code');
+      if (u.hash) hashParams = new URLSearchParams(u.hash.replace(/^#/, ''));
+    } catch {}
+    if (code) {
+      const { error } = await c.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+    } else if (hashParams && hashParams.get('access_token')) {
+      const { error } = await c.auth.setSession({
+        access_token: hashParams.get('access_token'),
+        refresh_token: hashParams.get('refresh_token')
+      });
+      if (error) throw error;
+    } else {
+      return false;
+    }
+    return true;
+  }
+
   global.NZSupabase = {
     adapter,
     ensureClient,
@@ -327,7 +384,16 @@
     uid: () => uid
   };
 
-  global.NZAuth = { getAuthInfo, secureWithEmail, signInEmail, signOutUser, lastEmail };
+  global.NZAuth = {
+    getAuthInfo,
+    secureWithEmail,
+    signInEmail,
+    signOutUser,
+    lastEmail,
+    signInWithGoogle,
+    signInWithApple,
+    completeOAuth
+  };
 
   // ---- KI (ruft die Edge Function "claude" auf; Schlüssel bleibt serverseitig) ----
   async function aiInvoke(mode, input) {
@@ -352,6 +418,100 @@
   };
 
   // Einheitliche Teilen-Schnittstelle (nur mit Cloud verfügbar).
+  // ---- Profile (@Nutzername) ----
+  function cleanUsername(name) {
+    return (name || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9._]/g, '');
+  }
+
+  async function getMyProfile() {
+    const c = await ensureClient();
+    const { data } = await c.from('profiles').select('uid, username, display_name').eq('uid', uid).maybeSingle();
+    return data || null;
+  }
+
+  async function setUsername(name, displayName) {
+    const c = await ensureClient();
+    const username = cleanUsername(name);
+    if (username.length < 3) throw new Error('too-short');
+    const { error } = await c
+      .from('profiles')
+      .upsert({ uid, username, display_name: displayName || null, updated_at: new Date().toISOString() });
+    if (error) {
+      if (error.code === '23505') throw new Error('taken'); // username unique-Verletzung
+      throw error;
+    }
+    return username;
+  }
+
+  async function findUser(name) {
+    const c = await ensureClient();
+    const username = cleanUsername(name);
+    if (!username) return null;
+    const { data } = await c
+      .from('profiles')
+      .select('uid, username, display_name')
+      .eq('username', username)
+      .maybeSingle();
+    return data || null;
+  }
+
+  // ---- Einladungen (Anfrage → Annehmen → geteilt) ----
+  async function sendInvite(note, toUid, fromName) {
+    const c = await ensureClient();
+    if (toUid === uid) throw new Error('self');
+    // Sicherstellen, dass die Notiz geteilt ist (Code vorhanden).
+    const code = await shareNote(note);
+    markSelfWrite();
+    const { error } = await c.from('invites').insert({
+      note_id: note.id,
+      code,
+      from_uid: uid,
+      from_name: fromName || null,
+      to_uid: toUid,
+      note_title: note.title || null,
+      status: 'pending'
+    });
+    if (error) throw error;
+    return true;
+  }
+
+  async function pendingInvites() {
+    const c = await ensureClient();
+    const { data } = await c
+      .from('invites')
+      .select('*')
+      .eq('to_uid', uid)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    return data || [];
+  }
+
+  async function acceptInvite(invite) {
+    const c = await ensureClient();
+    if (invite.code) await joinByCode(invite.code);
+    await c.from('invites').update({ status: 'accepted' }).eq('id', invite.id);
+    return invite.note_id;
+  }
+
+  async function declineInvite(invite) {
+    const c = await ensureClient();
+    await c.from('invites').update({ status: 'declined' }).eq('id', invite.id);
+  }
+
+  function onInvites(cb) {
+    ensureClient()
+      .then((c) => {
+        c.channel('nz-invites')
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'invites', filter: 'to_uid=eq.' + uid },
+            (p) => cb(p.new)
+          )
+          .subscribe();
+      })
+      .catch(() => {});
+  }
+
   global.NZShare = {
     available: () => true,
     shareNote,
@@ -361,4 +521,44 @@
     joinPresence,
     savePushToken
   };
+
+  // ---- Freundesliste (private Kontakte) ----
+  async function listFriends() {
+    const c = await ensureClient();
+    const { data } = await c
+      .from('friends')
+      .select('friend_uid, alias, friend_username')
+      .eq('owner', uid)
+      .order('created_at', { ascending: true });
+    return data || [];
+  }
+
+  async function addFriend(name, alias) {
+    const c = await ensureClient();
+    const user = await findUser(name);
+    if (!user) throw new Error('not-found');
+    if (user.uid === uid) throw new Error('self');
+    const { error } = await c.from('friends').upsert({
+      owner: uid,
+      friend_uid: user.uid,
+      alias: (alias && alias.trim()) || user.display_name || user.username,
+      friend_username: user.username
+    });
+    if (error) throw error;
+    return user;
+  }
+
+  async function setFriendAlias(friendUid, alias) {
+    const c = await ensureClient();
+    await c.from('friends').update({ alias: (alias || '').trim() || null }).eq('owner', uid).eq('friend_uid', friendUid);
+  }
+
+  async function removeFriend(friendUid) {
+    const c = await ensureClient();
+    await c.from('friends').delete().eq('owner', uid).eq('friend_uid', friendUid);
+  }
+
+  global.NZProfile = { getMyProfile, setUsername, findUser, cleanUsername };
+  global.NZInvites = { sendInvite, pendingInvites, acceptInvite, declineInvite, onInvites };
+  global.NZFriends = { listFriends, addFriend, setFriendAlias, removeFriend };
 })(typeof window !== 'undefined' ? window : globalThis);

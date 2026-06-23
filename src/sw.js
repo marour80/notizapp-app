@@ -1,14 +1,16 @@
 /* NotizApp Service Worker – App-Shell offline verfügbar machen. */
-const CACHE = 'notizapp-v2';
+const CACHE = 'notizapp-v3';
 const ASSETS = [
   '.',
   'index.html',
   'styles.css',
   'renderer.js',
   'core/config.js',
+  'core/i18n.js',
   'core/model.js',
   'core/device.js',
   'core/supabase.js',
+  'core/native.js',
   'core/store.js',
   'vendor/supabase.js',
   'vendor/qrcode.js',

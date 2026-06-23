@@ -10,8 +10,11 @@
 
 import Anthropic from 'npm:@anthropic-ai/sdk@0.69.0';
 
-// 💡 Günstiger & schneller? Auf "claude-haiku-4-5" ändern – für diese Aufgaben völlig ausreichend.
-const MODEL = 'claude-opus-4-8';
+// Modell-Mix fürs beste Preis/Qualitäts-Verhältnis:
+//  • Listen erstellen + "teile mit X" erkennen → Sonnet (stark, günstiger als Opus).
+//  • Einkauf sortieren (einfach) → Haiku (max. günstig).
+const MODEL_GENERATE = 'claude-sonnet-4-6';
+const MODEL_SORT = 'claude-haiku-4-5-20251001';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -59,15 +62,20 @@ async function generate(client: any, prompt: string, isVoice = false) {
     additionalProperties: false,
     properties: {
       title: { type: 'string' },
-      items: { type: 'array', items: { type: 'string' } }
+      items: { type: 'array', items: { type: 'string' } },
+      shareWith: { type: 'string' }
     },
     required: ['title', 'items']
   };
   const res = await client.messages.create({
-    model: MODEL,
+    model: MODEL_GENERATE,
     max_tokens: 1024,
     system:
-      'Du wandelst die Eingabe in eine übersichtliche Liste auf Deutsch um: einen kurzen Titel und passende Teilaufgaben (3–25 knappe Punkte, ohne Nummerierung).\n' +
+      'Du wandelst die Eingabe in eine übersichtliche Liste um: einen kurzen Titel und passende Teilaufgaben (3–25 knappe Punkte, ohne Nummerierung).\n' +
+      'ANTWORTE IN DERSELBEN SPRACHE wie die Eingabe des Nutzers (z. B. Deutsch auf Deutsch, Englisch auf Englisch). Titel UND Teilaufgaben in dieser Sprache.\n' +
+      'TEILEN: Sagt der Nutzer, dass er die Notiz mit jemandem teilen will (z. B. "…und teile das mit Mama", "share this with Anna", "schick das an Papa"), ' +
+      'dann schreib NUR den genannten Namen in das Feld "shareWith" (z. B. "Mama", "Anna", "Papa") und lass diesen Teil-mit-Satz aus den Teilaufgaben WEG. ' +
+      'Sagt er nichts vom Teilen, lass "shareWith" weg.\n' +
       'Erkenne dabei selbst, was gemeint ist:\n' +
       '• Nennt der Nutzer KONKRETE Dinge/Aufgaben (z. B. "Milch, Brot, Zahnarzt anrufen"), übernimm genau diese.\n' +
       '• Nennt der Nutzer ein VORHABEN oder ZIEL (z. B. "Tiramisu backen", "Geburtstagsparty planen", "für 3 Tage packen"), ' +
@@ -103,12 +111,13 @@ async function sortItems(client: any, items: string[]) {
     required: ['groups']
   };
   const res = await client.messages.create({
-    model: MODEL,
+    model: MODEL_SORT,
     max_tokens: 1024,
     system:
       'Du sortierst Einkaufslisten nach Supermarkt-Bereichen (z. B. Obst & Gemüse, Kühlregal, ' +
       'Backwaren, Getränke, Tiefkühl, Haushalt, Drogerie). Behalte die EXAKTEN Artikelnamen bei. ' +
-      'Ordne jeden Artikel genau einer Kategorie zu, in sinnvoller Einkaufs-Reihenfolge.',
+      'Ordne jeden Artikel genau einer Kategorie zu, in sinnvoller Einkaufs-Reihenfolge. ' +
+      'Die KATEGORIE-NAMEN in derselben Sprache wie die Artikel (deutsche Artikel → deutsche Kategorien, englische → englische).',
     output_config: { format: { type: 'json_schema', schema } },
     messages: [{ role: 'user', content: 'Sortiere diese Artikel nach Bereich:\n' + (items || []).join('\n') }]
   });

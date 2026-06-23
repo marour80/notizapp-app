@@ -21,22 +21,45 @@
     return decodeURIComponent(m ? m[1] : v).trim().toUpperCase();
   }
 
-  // Tiefen-Link: notizapp://join?code=XXX → ruft handler(code).
+  function isAuthCallback(url) {
+    return /login-callback/i.test(url || '');
+  }
+
+  // Tiefen-Link: smartnote://join?code=XXX → ruft handler(code). Login-Rückleitung wird ignoriert.
   function onDeepLink(handler) {
     const App = plugin('App');
     if (!App) return;
     App.addListener('appUrlOpen', (data) => {
-      const code = parseCode(data && data.url);
+      const url = (data && data.url) || '';
+      if (isAuthCallback(url)) return; // OAuth → onAuthCallback
+      const code = parseCode(url);
       if (code) handler(code);
     });
     // Falls die App per Link aus dem kalten Zustand gestartet wurde:
     if (App.getLaunchUrl) {
       App.getLaunchUrl()
         .then((res) => {
-          if (res && res.url) {
+          if (res && res.url && !isAuthCallback(res.url)) {
             const c = parseCode(res.url);
             if (c) handler(c);
           }
+        })
+        .catch(() => {});
+    }
+  }
+
+  // Login-Rückleitung smartnote://login-callback?code=… → ruft handler(url).
+  function onAuthCallback(handler) {
+    const App = plugin('App');
+    if (!App) return;
+    App.addListener('appUrlOpen', (data) => {
+      const url = (data && data.url) || '';
+      if (isAuthCallback(url)) handler(url);
+    });
+    if (App.getLaunchUrl) {
+      App.getLaunchUrl()
+        .then((res) => {
+          if (res && res.url && isAuthCallback(res.url)) handler(res.url);
         })
         .catch(() => {});
     }
@@ -59,6 +82,32 @@
     return list.length ? list[0].rawValue || list[0].displayValue || '' : '';
   }
 
+  // ---- Kamera / Foto ----
+  function cameraAvailable() {
+    return !!plugin('Camera');
+  }
+
+  // Foto aufnehmen ODER aus Galerie wählen (nativer Dialog). Liefert eine DataURL.
+  // Wirft 'no-camera', wenn kein Plugin da ist; bei Abbruch eine Fehlermeldung mit "cancel".
+  async function takePhoto(labels) {
+    const Camera = plugin('Camera');
+    if (!Camera || !Camera.getPhoto) throw new Error('no-camera');
+    const l = labels || {};
+    const photo = await Camera.getPhoto({
+      quality: 50,
+      width: 900,
+      resultType: 'dataUrl', // direkt als data:image/...;base64 → passt in die Notiz
+      source: 'PROMPT', // fragt: Foto aufnehmen / Aus Galerie
+      correctOrientation: true,
+      saveToGallery: false,
+      promptLabelHeader: l.header,
+      promptLabelPicture: l.camera,
+      promptLabelPhoto: l.gallery,
+      promptLabelCancel: l.cancel
+    });
+    return photo && photo.dataUrl;
+  }
+
   // ---- Push (Teil 2) ----
   // Registriert das Gerät für Push und liefert den FCM-Token via onToken(token).
   async function registerPush(onToken) {
@@ -72,5 +121,5 @@
     return true;
   }
 
-  global.NZNative = { isNative, onDeepLink, scanAvailable, scanQR, registerPush, parseCode, plugin };
+  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, registerPush, parseCode, plugin };
 })(typeof window !== 'undefined' ? window : globalThis);

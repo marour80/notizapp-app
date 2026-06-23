@@ -1,10 +1,9 @@
-// NotizApp – Push-Versand via Firebase Cloud Messaging (HTTP v1).
+// SmartNote – Push-Versand via Firebase Cloud Messaging (HTTP v1).
 // Wird von einem Supabase Database Webhook bei UPDATE auf "notes" aufgerufen.
 //
-// Benötigte Secrets (supabase secrets set ...):
-//   FIREBASE_SERVICE_ACCOUNT  = Inhalt der Service-Account-JSON (eine Zeile)
-//   SUPABASE_URL              = (automatisch vorhanden)
-//   SUPABASE_SERVICE_ROLE_KEY = (automatisch vorhanden)
+// Benötigte Secrets (Supabase → Edge Functions → Secrets):
+//   FCM_SA_B64 = Base64 des Firebase-Service-Account-JSON (eine Zeile)
+//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  = automatisch vorhanden
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -32,7 +31,7 @@ async function getAccessToken(sa: any): Promise<string> {
       JSON.stringify({
         iss: sa.client_email,
         scope: 'https://www.googleapis.com/auth/firebase.messaging',
-        aud: sa.token_uri,
+        aud: sa.token_uri || 'https://oauth2.googleapis.com/token',
         iat: now,
         exp: now + 3600
       })
@@ -49,7 +48,7 @@ async function getAccessToken(sa: any): Promise<string> {
   const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(data));
   const jwt = `${data}.${b64url(sig)}`;
 
-  const res = await fetch(sa.token_uri, {
+  const res = await fetch(sa.token_uri || 'https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
@@ -66,26 +65,36 @@ Deno.serve(async (req) => {
     const noteId: string = note.id;
     const actor: string | null = note.last_actor || null;
     const title: string = (note.data && note.data.title) || 'Geteilte Notiz';
-    if (!noteId) return new Response('no note', { status: 200 });
+    console.log('notify: noteId=' + noteId + ' share_code=' + (note.share_code || '-') + ' actor=' + (actor || '-'));
+    // Nur geteilte Notizen sind relevant (sonst gibt es ohnehin keine Mitglieder).
+    if (!noteId || !note.share_code) {
+      console.log('notify: skip (nicht geteilt)');
+      return new Response('skip', { status: 200 });
+    }
 
-    const supa = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    // Mitglieder der Notiz (ohne den Verursacher)
+    // Empfänger = Mitglieder + Besitzer, ohne den Verursacher.
     const { data: members } = await supa.from('note_members').select('member').eq('note_id', noteId);
     let targets = (members || []).map((m: any) => m.member);
-    // Besitzer ist kein Mitglied-Eintrag → ebenfalls einbeziehen
     if (note.owner) targets.push(note.owner);
     targets = targets.filter((id: string, i: number, a: string[]) => id && id !== actor && a.indexOf(id) === i);
-    if (!targets.length) return new Response('no targets', { status: 200 });
+    console.log('notify: owner=' + (note.owner || '-') + ' members=' + JSON.stringify((members || []).map((m: any) => m.member)) + ' targets=' + JSON.stringify(targets));
+    if (!targets.length) {
+      console.log('notify: keine Empfänger (targets leer)');
+      return new Response('no targets', { status: 200 });
+    }
 
-    const { data: toks } = await supa.from('push_tokens').select('token').in('device', targets);
+    const { data: toks, error: tokErr } = await supa.from('push_tokens').select('device, token').in('device', targets);
+    if (tokErr) console.log('notify: push_tokens-Fehler: ' + tokErr.message);
     const tokens = (toks || []).map((t: any) => t.token).filter(Boolean);
-    if (!tokens.length) return new Response('no tokens', { status: 200 });
+    console.log('notify: gefundene Tokens=' + tokens.length + ' (für devices ' + JSON.stringify((toks || []).map((t: any) => t.device)) + ')');
+    if (!tokens.length) {
+      console.log('notify: KEINE Tokens für die Empfänger → nichts gesendet');
+      return new Response('no tokens', { status: 200 });
+    }
 
-    const sa = JSON.parse(Deno.env.get('FIREBASE_SERVICE_ACCOUNT')!);
+    const sa = JSON.parse(atob(Deno.env.get('FCM_SA_B64')!));
     const accessToken = await getAccessToken(sa);
     const url = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
 
@@ -97,16 +106,25 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           message: {
             token,
-            notification: { title: 'NotizApp', body: `„${title}" wurde aktualisiert.` },
+            notification: { title: 'SmartNote', body: `„${title}" wurde aktualisiert.` },
             data: { noteId },
-            android: { priority: 'HIGH' }
+            android: { priority: 'HIGH', notification: { sound: 'default' } }
           }
         })
       });
-      if (r.ok) sent++;
+      if (r.ok) {
+        sent++;
+      } else {
+        const errTxt = await r.text();
+        console.log('notify: FCM-Fehler ' + r.status + ': ' + errTxt.slice(0, 300));
+      }
     }
-    return new Response(JSON.stringify({ sent }), { headers: { 'Content-Type': 'application/json' } });
+    console.log('notify: FERTIG sent=' + sent + ' von ' + tokens.length);
+    return new Response(JSON.stringify({ sent, total: tokens.length }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (e) {
-    return new Response('error: ' + (e?.message || e), { status: 500 });
+    console.log('notify: EXCEPTION ' + ((e as any)?.message || e));
+    return new Response('error: ' + ((e as any)?.message || e), { status: 500 });
   }
 });

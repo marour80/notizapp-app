@@ -200,6 +200,43 @@ input, textarea, [contenteditable], .body-input, .preview {
   font-size: 13px;
 }
 .theme-toggle:hover { color: var(--text); border-color: var(--accent); }
+.bottom-row { display: flex; gap: 8px; }
+.bottom-row .theme-toggle { flex: 1; }
+
+/* In-App-Hinweise (Toast) */
+.toast-host {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  width: max-content;
+  max-width: 92vw;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--bg-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast .toast-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.app-version { text-align: center; font-size: 10.5px; color: var(--text-faint); padding: 8px 0 2px; letter-spacing: 0.3px; }
 
 /* ---- Status dots & controls ---- */
 .dot {
@@ -292,19 +329,48 @@ input, textarea, [contenteditable], .body-input, .preview {
 .note-list { list-style: none; overflow-y: auto; padding: 0 10px 10px; flex: 1; }
 
 .note-card {
-  padding: 13px 14px;
+  position: relative;
+  overflow: hidden;
   border-radius: 10px;
-  cursor: pointer;
   margin-bottom: 6px;
   border: 1px solid transparent;
-  transition: background 0.12s, border 0.12s;
+  border-left: 3px solid transparent;
 }
-.note-card:hover { background: var(--bg-2); }
-.note-card.active { background: var(--bg-2); border-color: var(--accent); }
-.note-card { border-left: 3px solid transparent; }
+.note-card.active { border-color: var(--accent); }
 .note-card.status-todo { border-left-color: #ff5c72; }
 .note-card.status-doing { border-left-color: #ffb340; }
 .note-card.status-done { border-left-color: #3ad17a; }
+.note-card .card-inner {
+  position: relative;
+  z-index: 1;
+  padding: 13px 14px;
+  background: var(--bg);
+  cursor: pointer;
+  transform: translateX(0);
+  transition: transform 0.2s ease, background 0.12s;
+  touch-action: pan-y; /* vertikal scrollen erlaubt, horizontal fangen wir fürs Wischen ab */
+}
+.note-card:hover .card-inner { background: var(--bg-2); }
+.note-card.active .card-inner { background: var(--bg-2); }
+.note-card.dragging .card-inner { transition: background 0.12s; } /* beim Ziehen dem Finger folgen */
+.note-card.swiped .card-inner { transform: translateX(-86px); }
+.note-card .card-delete {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 86px;
+  border: none;
+  background: var(--danger);
+  color: #fff;
+  font-size: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 0;
+}
+.note-card .card-delete:active { filter: brightness(0.88); }
 .note-card .card-title-row {
   display: flex;
   align-items: center;
@@ -416,7 +482,7 @@ input, textarea, [contenteditable], .body-input, .preview {
 .title-input::placeholder { color: var(--text-faint); }
 
 .meta-row { display: flex; gap: 10px; padding: 0 24px 12px; }
-.folder-select, .tags-input {
+.folder-select {
   background: var(--bg-3);
   border: 1px solid var(--border);
   color: var(--text-dim);
@@ -424,10 +490,10 @@ input, textarea, [contenteditable], .body-input, .preview {
   padding: 6px 10px;
   font-size: 12.5px;
   outline: none;
+  cursor: pointer;
+  flex: 1;
 }
-.folder-select { cursor: pointer; }
-.tags-input { flex: 1; }
-.tags-input:focus, .folder-select:focus { border-color: var(--accent); }
+.folder-select:focus { border-color: var(--accent); }
 
 .body-input {
   flex: 1;
@@ -443,25 +509,34 @@ input, textarea, [contenteditable], .body-input, .preview {
 }
 .body-input::placeholder { color: var(--text-faint); }
 
-.preview {
+/* Textfeld mit Autoren-Farben (wer hat welche Zeile geschrieben) */
+.body-colored {
   flex: 1;
   overflow-y: auto;
   padding: 8px 24px 20px;
   font-size: 15px;
   line-height: 1.7;
+  color: var(--text);
+  cursor: text;
 }
-.preview h1 { font-size: 24px; margin: 16px 0 8px; }
-.preview h2 { font-size: 19px; margin: 14px 0 6px; }
-.preview ul { margin: 8px 0 8px 22px; }
-.preview code {
-  background: var(--bg-3);
-  padding: 2px 6px;
-  border-radius: 5px;
-  font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 13px;
+.body-colored .bl {
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 1px 8px;
+  border-left: 3px solid transparent;
+  border-radius: 0 4px 4px 0;
 }
-.preview strong { color: var(--text); }
-.preview p { margin-bottom: 10px; }
+.body-colored .bl[style*="--c"] {
+  border-left-color: var(--c);
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+}
+.body-colored .bl-none { padding-left: 11px; }
+.body-empty { color: var(--text-faint); padding: 1px 8px; }
+.body-hint {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  padding: 0 24px 8px;
+}
 
 /* ---- Subtasks ---- */
 .subtasks {
@@ -539,6 +614,40 @@ input, textarea, [contenteditable], .body-input, .preview {
 }
 .sub-item:hover .sub-del { opacity: 1; }
 .sub-item .sub-del:hover { color: var(--danger); }
+.sub-item .sub-photo {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.55;
+  padding: 2px 4px;
+  line-height: 1;
+}
+.sub-item .sub-photo:hover { opacity: 1; }
+.sub-item .sub-thumb {
+  width: 30px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+/* Foto-Vollbild */
+.photo-view {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.photo-view img {
+  max-width: 92vw;
+  max-height: 72vh;
+  border-radius: 10px;
+  background: var(--bg-3);
+}
 .sub-add {
   display: flex;
   align-items: center;
@@ -822,6 +931,117 @@ input, textarea, [contenteditable], .body-input, .preview {
 .auth-switch a { color: var(--accent); cursor: pointer; font-weight: 600; text-decoration: none; margin-left: 4px; }
 .auth-switch a:hover { text-decoration: underline; }
 
+/* Anmelden mit Google / Apple */
+.oauth-row { margin: 4px 0 8px; }
+.oauth-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #fff;
+  color: #1f1f1f;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.oauth-btn:hover { filter: brightness(0.97); }
+.oauth-btn:disabled { opacity: 0.6; cursor: default; }
+.oauth-btn .oauth-icon { display: inline-flex; font-size: 17px; line-height: 1; }
+.oauth-apple { background: #000; color: #fff; border-color: #000; }
+.auth-or {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin: 10px 0 12px;
+  position: relative;
+}
+.auth-or::before,
+.auth-or::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 38%;
+  height: 1px;
+  background: var(--border);
+}
+.auth-or::before { left: 0; }
+.auth-or::after { right: 0; }
+
+/* Teilen per @Nutzername */
+.invite-box, .profile-box { margin: 2px 0 8px; }
+.invite-box label, .profile-box label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+.invite-msg { font-size: 12.5px; color: var(--text-dim); margin-top: 7px; }
+.invite-msg.err { color: var(--danger); }
+#inviteUser, #usernameInput {
+  flex: 1;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 15px;
+  outline: none;
+}
+#inviteUser:focus, #usernameInput:focus { border-color: var(--accent); }
+.invite-box .primary-btn, .profile-box .primary-btn { width: auto; padding: 10px 16px; flex: 0 0 auto; }
+
+/* Freunde */
+.friends-share { margin-top: 10px; }
+.friend-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.friend-chip {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.friend-chip:hover { border-color: var(--accent); }
+.friend-chip:active { transform: scale(0.97); }
+.friend-chip.matched { background: var(--accent); color: #fff; }
+#voiceShareChips { margin: 6px 0 14px; }
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 0 2px;
+}
+.link-btn:hover { text-decoration: underline; }
+.friends-list { list-style: none; margin-top: 14px; max-height: 46vh; overflow-y: auto; }
+.friends-empty { color: var(--text-faint); font-size: 13px; text-align: center; padding: 16px 0; }
+.friend-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.friend-row .friend-alias {
+  flex: 1;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  outline: none;
+}
+.friend-row .friend-alias:focus { border-color: var(--accent); }
+.friend-row .friend-handle { font-size: 11.5px; color: var(--text-faint); white-space: nowrap; }
+.friend-row .friend-del {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+}
+.friend-row .friend-del:hover { color: var(--danger); }
+
 /* ---- Mobile / Responsive ---- */
 .mobile-only { display: none; }
 .icon-btn {
@@ -918,7 +1138,7 @@ input, textarea, [contenteditable], .body-input, .preview {
     font-weight: 600;
   }
   .editor-toolbar { padding: 10px 14px; }
-  .title-input, .meta-row, .status-row, .body-input, .preview, .subtasks, .badge-row { padding-left: 16px; padding-right: 16px; }
+  .title-input, .meta-row, .status-row, .body-input, .body-colored, .body-hint, .subtasks, .badge-row { padding-left: 16px; padding-right: 16px; }
   .modal { width: 92vw; }
 }
 

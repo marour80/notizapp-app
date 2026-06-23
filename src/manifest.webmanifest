@@ -1,6 +1,6 @@
 {
-  "name": "NotizApp",
-  "short_name": "NotizApp",
+  "name": "SmartNote",
+  "short_name": "SmartNote",
   "description": "Notizen & Listen teilen – live, ohne Anmeldung.",
   "start_url": ".",
   "scope": ".",

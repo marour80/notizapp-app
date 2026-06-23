@@ -19,12 +19,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Tiefen-Link: notizapp://join?code=XXX öffnet die App -->
+            <!-- Tiefen-Link: smartnote://join?code=XXX öffnet die App -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="notizapp" />
+                <data android:scheme="smartnote" />
             </intent-filter>
         </activity>
 

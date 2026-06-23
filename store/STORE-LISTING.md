@@ -1,13 +1,13 @@
 # Play-Store-Eintrag – Texte zum Reinkopieren
 
 ## App-Name
-NotizApp
+SmartNote
 
 ## Kurzbeschreibung (max. 80 Zeichen)
 Notizen & Listen teilen – mit KI, Sprachnotizen und Live-Synchronisation.
 
 ## Vollständige Beschreibung
-NotizApp ist die kinderleichte App für Notizen und To-do-/Einkaufslisten – schön, schnell und smart. Erstelle Listen, teile sie mit Familie oder Freunden und arbeitet in Echtzeit gemeinsam daran.
+SmartNote ist die kinderleichte App für Notizen und To-do-/Einkaufslisten – schön, schnell und smart. Erstelle Listen, teile sie mit Familie oder Freunden und arbeitet in Echtzeit gemeinsam daran.
 
 ✨ KI, die mitdenkt
 • Sag oder tippe einfach „Tiramisu backen" – die KI erstellt die passende Zutatenliste, sogar mit Mengen und für deine Wunsch-Portionen.
@@ -30,7 +30,7 @@ NotizApp ist die kinderleichte App für Notizen und To-do-/Einkaufslisten – sc
 🔒 Deine Notizen, sicher
 • Optionale Anmeldung mit E-Mail – damit deine Notizen Neustart, Neuinstallation und Gerätewechsel überstehen und auf all deinen Geräten gleich sind.
 
-Egal ob Einkaufsliste mit der Familie, Packliste für den Urlaub oder die nächste Party – NotizApp macht's einfach.
+Egal ob Einkaufsliste mit der Familie, Packliste für den Urlaub oder die nächste Party – SmartNote macht's einfach.
 
 ## Kategorie
 Produktivität

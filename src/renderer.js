@@ -2,7 +2,6 @@
 let data = { notes: [], folders: [] };
 let activeNoteId = null;
 let currentFolder = '__all__';
-let currentTag = null;
 let currentStatus = 'all';
 let searchTerm = '';
 let saveTimer = null;
@@ -11,26 +10,109 @@ let saveTimer = null;
 const $ = (id) => document.getElementById(id);
 const noteListEl = $('noteList');
 const folderListEl = $('folderList');
-const tagListEl = $('tagList');
 const editorEl = $('editor');
 const editorEmptyEl = $('editorEmpty');
 const titleInput = $('titleInput');
 const bodyInput = $('bodyInput');
-const tagsInput = $('tagsInput');
+const bodyColoredEl = $('bodyColored');
 const folderSelect = $('folderSelect');
-const previewEl = $('preview');
 
 // ---- Core aliases (plattformunabhängig, siehe src/core/) ----
-const { uid, deriveStatus, applyAutoStatus, statusLabel, escapeHtml, stripMd, formatDate } = NZ;
+const { uid, deriveStatus, applyAutoStatus, escapeHtml, stripMd, formatDate } = NZ;
 const STATUS_ORDER = NZ.STATUS_ORDER;
+
+// ---- i18n (Deutsch / Englisch) ----
+const t = (key, vars) => (window.NZI18N ? NZI18N.t(key, vars) : key);
+function statusLabel(s) {
+  return t({ todo: 'statusTodo', doing: 'statusDoing', done: 'statusDone' }[s] || 'statusTodo');
+}
+
+// ---- In-App-Hinweise (Toast) ----
+function showToast(msg, color) {
+  const host = $('toastHost');
+  if (!host) return;
+  const el = document.createElement('div');
+  el.className = 'toast';
+  const c = color || 'var(--accent)';
+  el.innerHTML = `<span class="toast-dot" style="background:${c}"></span><span>${escapeHtml(msg)}</span>`;
+  host.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 250);
+  }, 3600);
+}
+
+// Wer hat die Notiz zuletzt geändert? Aus den Daten abgeleitet (nicht ich selbst).
+function actorOfNote(note) {
+  if (!note) return null;
+  const myId = NZDevice.getId();
+  let best = null;
+  let bestT = -1;
+  (note.subtasks || []).forEach((s) => {
+    const u = s.updatedBy;
+    if (u && u.id && u.id !== myId && (s.updatedAt || 0) >= bestT) {
+      bestT = s.updatedAt || 0;
+      best = u;
+    }
+  });
+  if (!best) {
+    (note.bodyLines || []).forEach((l) => {
+      if (!best && l.by && l.by !== myId && l.name) best = { id: l.by, nickname: l.name, color: l.color };
+    });
+  }
+  return best;
+}
+
+// Hinweis anzeigen, wenn jemand anderes eine GETEILTE Notiz ändert (mit Throttle).
+const toastLast = {};
+function notifyShared(info) {
+  if (!info || !info.id || info.event === 'DELETE') return;
+  const note = data.notes.find((n) => n.id === info.id);
+  if (!note || !(note.share && note.share.code)) return; // nur geteilte Notizen
+  const now = Date.now();
+  if (toastLast[info.id] && now - toastLast[info.id] < 4000) return;
+  toastLast[info.id] = now;
+  const actor = actorOfNote(note);
+  const title = (info.title || '').trim() || t('untitled');
+  if (actor) showToast(t('toastUpdatedBy', { who: actor.nickname || t('someone'), title }), actor.color);
+  else showToast(t('toastUpdated', { title }));
+}
 
 // ---- Init ----
 (async function init() {
   data = await NZStore.load();
+  const ver = (window.NZ_CONFIG && NZ_CONFIG.VERSION) || '';
+  if (ver) $('appVersion').textContent = 'v' + ver;
+  applyLanguage(); // setzt statische Texte + Toggle-Label
   const theme = localStorage.getItem('theme') || 'dark';
   applyTheme(theme);
   renderAll();
 })();
+
+// ---- Sprache anwenden / umschalten ----
+function applyLanguage() {
+  if (!window.NZI18N) return;
+  NZI18N.apply();
+  const lt = $('langToggle');
+  if (lt) lt.textContent = NZI18N.lang === 'de' ? '🌐 EN' : '🌐 DE';
+}
+function toggleLanguage() {
+  if (!window.NZI18N) return;
+  NZI18N.set(NZI18N.lang === 'de' ? 'en' : 'de');
+  applyLanguage();
+  // dynamische UI neu aufbauen
+  const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+  $('themeToggle').textContent = theme === 'dark' ? t('themeDark') : t('themeLight');
+  renderAll();
+  updateAccountUI();
+  const note = currentNote();
+  if (note) {
+    renderStatusRow(note.status || 'todo');
+    renderSubtasks();
+    updateSharedBadge(note);
+  }
+}
 
 // Live-sync when another window/tab/device changes notes
 NZStore.onChanged(async (info) => {
@@ -39,10 +121,7 @@ NZStore.onChanged(async (info) => {
 
   // Offene Notiz wurde gelöscht?
   if (activeNoteId && !data.notes.find((n) => n.id === activeNoteId)) {
-    activeNoteId = null;
-    leavePresence();
-    editorEl.classList.add('hidden');
-    editorEmptyEl.classList.remove('hidden');
+    closeEditor();
     return;
   }
 
@@ -54,9 +133,14 @@ NZStore.onChanged(async (info) => {
       renderSubtasks();
       updateSharedBadge(currentNote());
     }
+    // Text des/der anderen live nachziehen (nur wenn ich nicht gerade selbst tippe).
+    syncBodyFromRemote(currentNote());
   }
 
-  // Benachrichtigung, wenn Fenster nicht im Fokus ist.
+  // In-App-Hinweis: jemand arbeitet an einer geteilten Notiz.
+  notifyShared(info);
+
+  // Zusätzlich System-Benachrichtigung, wenn das Fenster nicht im Fokus ist.
   if (info && info.id && !document.hasFocus()) {
     notifyChange(info.title);
   }
@@ -86,9 +170,6 @@ function filteredNotes() {
   if (currentFolder !== '__all__') {
     list = list.filter((n) => (n.folder || '') === currentFolder);
   }
-  if (currentTag) {
-    list = list.filter((n) => (n.tags || []).includes(currentTag));
-  }
   if (currentStatus !== 'all') {
     list = list.filter((n) => (n.status || 'todo') === currentStatus);
   }
@@ -97,8 +178,7 @@ function filteredNotes() {
     list = list.filter(
       (n) =>
         (n.title || '').toLowerCase().includes(q) ||
-        (n.body || '').toLowerCase().includes(q) ||
-        (n.tags || []).some((t) => t.toLowerCase().includes(q))
+        (n.body || '').toLowerCase().includes(q)
     );
   }
   return list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
@@ -107,14 +187,13 @@ function filteredNotes() {
 // ---- Rendering ----
 function renderAll() {
   renderFolders();
-  renderTags();
   renderFolderSelect();
   renderNoteList();
 }
 
 function renderFolders() {
   folderListEl.innerHTML = '';
-  const items = [{ key: '__all__', label: 'Alle Notizen', icon: '✦' }];
+  const items = [{ key: '__all__', label: t('allNotes'), icon: '✦' }];
   data.folders.forEach((f) => items.push({ key: f, label: f, icon: '📁' }));
 
   items.forEach((it) => {
@@ -127,39 +206,18 @@ function renderFolders() {
     li.innerHTML = `<span class="ficon">${it.icon}</span><span>${escapeHtml(it.label)}</span><span class="fcount">${count}</span>`;
     li.onclick = () => {
       currentFolder = it.key;
-      currentTag = null;
       renderAll();
     };
     if (it.key !== '__all__') {
       li.ondblclick = () => deleteFolder(it.key);
-      li.title = 'Doppelklick zum Löschen';
+      li.title = t('dblClickDelete');
     }
     folderListEl.appendChild(li);
   });
 }
 
-function renderTags() {
-  const allTags = new Set();
-  data.notes.forEach((n) => (n.tags || []).forEach((t) => allTags.add(t)));
-  tagListEl.innerHTML = '';
-  if (allTags.size === 0) {
-    tagListEl.innerHTML = '<span style="font-size:11px;color:var(--text-faint);padding:4px 6px;">Noch keine Tags</span>';
-    return;
-  }
-  [...allTags].sort().forEach((t) => {
-    const li = document.createElement('li');
-    li.className = 'tag-chip' + (currentTag === t ? ' active' : '');
-    li.textContent = '#' + t;
-    li.onclick = () => {
-      currentTag = currentTag === t ? null : t;
-      renderAll();
-    };
-    tagListEl.appendChild(li);
-  });
-}
-
 function renderFolderSelect() {
-  folderSelect.innerHTML = '<option value="">Kein Ordner</option>';
+  folderSelect.innerHTML = '<option value="">' + t('noFolder') + '</option>';
   data.folders.forEach((f) => {
     const opt = document.createElement('option');
     opt.value = f;
@@ -171,8 +229,7 @@ function renderFolderSelect() {
 function renderNoteList() {
   const list = filteredNotes();
   $('noteCount').textContent = list.length;
-  $('listTitle').textContent =
-    currentTag ? '#' + currentTag : currentFolder === '__all__' ? 'Alle Notizen' : currentFolder;
+  $('listTitle').textContent = currentFolder === '__all__' ? t('allNotes') : currentFolder;
 
   noteListEl.innerHTML = '';
   $('emptyList').classList.toggle('hidden', list.length > 0);
@@ -182,10 +239,6 @@ function renderNoteList() {
     const hasSubs = (n.subtasks || []).length > 0;
     const li = document.createElement('li');
     li.className = 'note-card status-' + status + (n.id === activeNoteId ? ' active' : '');
-    const tagHtml = (n.tags || [])
-      .slice(0, 2)
-      .map((t) => `<span class="card-tag">#${escapeHtml(t)}</span>`)
-      .join('');
     const subs = n.subtasks || [];
     const subDone = subs.filter((s) => (s.status || 'todo') === 'done').length;
     const subHtml = subs.length
@@ -194,22 +247,109 @@ function renderNoteList() {
     const shareHtml = n.share && n.share.code ? '<span class="card-share">🔗</span>' : '';
     const snippet = escapeHtml(stripMd(n.body || ''));
     li.innerHTML = `
-      <div class="card-title-row">
-        <span class="dot dot-${status}" title="${statusLabel(status)}${hasSubs ? ' (aus Teilaufgaben)' : ' – Klick zum Wechseln'}"></span>
-        <h3>${escapeHtml(n.title) || 'Ohne Titel'}</h3>
-      </div>
-      <div class="snippet">${snippet || (subs.length ? subs.map((s) => '• ' + escapeHtml(s.text)).join('  ') : 'Keine weiteren Inhalte')}</div>
-      <div class="card-meta">${shareHtml}${subHtml}${tagHtml}<span>${formatDate(n.updatedAt)}</span></div>`;
-    li.querySelector('.dot').onclick = (e) => {
+      <button class="card-delete" aria-label="${t('delete')}" title="${t('delete')}">🗑</button>
+      <div class="card-inner">
+        <div class="card-title-row">
+          <span class="dot dot-${status}" title="${statusLabel(status)}${hasSubs ? ' ' + t('fromSubtasks') : ' ' + t('clickToCycle')}"></span>
+          <h3>${escapeHtml(n.title) || t('untitled')}</h3>
+        </div>
+        <div class="snippet">${snippet || (subs.length ? subs.map((s) => '• ' + escapeHtml(s.text)).join('  ') : t('noContent'))}</div>
+        <div class="card-meta">${shareHtml}${subHtml}<span>${formatDate(n.updatedAt)}</span></div>
+      </div>`;
+    const inner = li.querySelector('.card-inner');
+    inner.querySelector('.dot').onclick = (e) => {
       e.stopPropagation();
+      if (li.classList.contains('swiped')) return closeSwipe(li);
       if (hasSubs) {
         openNote(n.id); // status is auto from subtasks → open to edit them
       } else {
         cycleStatus(n.id);
       }
     };
-    li.onclick = () => openNote(n.id);
+    li.querySelector('.card-delete').onclick = (e) => {
+      e.stopPropagation();
+      deleteNoteById(n.id);
+    };
+    attachSwipe(li, inner, n.id);
     noteListEl.appendChild(li);
+  });
+}
+
+// ---- Wisch-zum-Löschen auf den Notiz-Karten (Handy-typisch) ----
+let openSwipedCard = null;
+
+function closeSwipe(li) {
+  if (li) li.classList.remove('swiped');
+  if (openSwipedCard === li) openSwipedCard = null;
+}
+function closeAllSwipes() {
+  if (openSwipedCard) closeSwipe(openSwipedCard);
+}
+
+function attachSwipe(li, inner, noteId) {
+  let startX = 0;
+  let startY = 0;
+  let dx = 0;
+  let decided = null; // 'h' | 'v'
+  let active = false;
+  let suppressClick = false;
+
+  inner.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    active = true;
+    decided = null;
+    dx = 0;
+    startX = e.clientX;
+    startY = e.clientY;
+  });
+
+  inner.addEventListener('pointermove', (e) => {
+    if (!active) return;
+    const mx = e.clientX - startX;
+    const my = e.clientY - startY;
+    if (decided === null) {
+      if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+      decided = Math.abs(mx) > Math.abs(my) ? 'h' : 'v';
+      if (decided === 'h') {
+        if (openSwipedCard && openSwipedCard !== li) closeSwipe(openSwipedCard);
+        li.classList.add('dragging');
+        try { inner.setPointerCapture(e.pointerId); } catch {}
+      }
+    }
+    if (decided !== 'h') return;
+    suppressClick = true;
+    const base = li.classList.contains('swiped') ? -86 : 0;
+    dx = Math.max(-100, Math.min(0, base + mx));
+    inner.style.transform = 'translateX(' + dx + 'px)';
+    e.preventDefault();
+  });
+
+  const end = () => {
+    if (!active) return;
+    active = false;
+    li.classList.remove('dragging');
+    inner.style.transform = '';
+    if (decided === 'h') {
+      if (dx < -43) {
+        li.classList.add('swiped');
+        openSwipedCard = li;
+      } else {
+        closeSwipe(li);
+      }
+    }
+  };
+  inner.addEventListener('pointerup', end);
+  inner.addEventListener('pointercancel', end);
+
+  inner.addEventListener('click', (e) => {
+    if (suppressClick) {
+      suppressClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (li.classList.contains('swiped')) return closeSwipe(li);
+    openNote(noteId);
   });
 }
 
@@ -220,7 +360,7 @@ function newNote() {
     title: '',
     body: '',
     folder: currentFolder === '__all__' ? '' : currentFolder,
-    tags: currentTag ? [currentTag] : [],
+    tags: [],
     status: currentStatus !== 'all' ? currentStatus : 'todo',
     createdAt: Date.now(),
     updatedAt: Date.now()
@@ -235,20 +375,19 @@ function newNote() {
 function openNote(id) {
   const note = data.notes.find((n) => n.id === id);
   if (!note) return;
+  closeAllSwipes();
   activeNoteId = id;
   document.body.classList.add('editor-open'); // Handy: Editor-Ebene einblenden
   setNav(false);
   editorEmptyEl.classList.add('hidden');
   editorEl.classList.remove('hidden');
   titleInput.value = note.title || '';
-  bodyInput.value = note.body || '';
-  tagsInput.value = (note.tags || []).join(', ');
+  setupBodyFor(note);
   folderSelect.value = note.folder || '';
   renderStatusRow(note.status || 'todo');
   renderSubtasks();
   updateSharedBadge(note);
   updatePresence(note);
-  showEditMode();
   renderNoteList();
 }
 
@@ -260,34 +399,45 @@ function scheduleSave() {
   const note = currentNote();
   if (!note) return;
   note.title = titleInput.value;
-  note.body = bodyInput.value;
+  note.bodyLines = NZ.attributeBody(ensureBodyLines(note), bodyInput.value, NZDevice.me());
+  note.body = NZ.linesToText(note.bodyLines);
   note.folder = folderSelect.value;
-  note.tags = tagsInput.value
-    .split(',')
-    .map((t) => t.trim())
-    .filter(Boolean);
   note.updatedAt = Date.now();
-  $('savedHint').textContent = 'Speichern…';
+  $('savedHint').textContent = t('saving');
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     persist();
-    $('savedHint').textContent = 'Automatisch gespeichert ✓';
+    $('savedHint').textContent = t('savedAutoCheck');
     renderFolders();
-    renderTags();
     renderNoteList();
   }, 400);
+}
+
+// Editor schließen und zurück zur Liste (wichtig fürs Handy: schließt das Overlay).
+function closeEditor() {
+  activeNoteId = null;
+  leavePresence();
+  editorEl.classList.add('hidden');
+  editorEmptyEl.classList.remove('hidden');
+  document.body.classList.remove('editor-open');
 }
 
 function deleteNote() {
   const note = currentNote();
   if (!note) return;
-  if (!confirm('Diese Notiz wirklich löschen?')) return;
+  if (!confirm(t('deleteNoteConfirm'))) return;
   data.notes = data.notes.filter((n) => n.id !== note.id);
-  activeNoteId = null;
-  leavePresence();
   persist();
-  editorEl.classList.add('hidden');
-  editorEmptyEl.classList.remove('hidden');
+  closeEditor();
+  renderAll();
+}
+
+// Direkt aus der Liste löschen (per Wischen) – ohne Editor, ohne Extra-Bestätigung.
+function deleteNoteById(id) {
+  data.notes = data.notes.filter((n) => n.id !== id);
+  if (openSwipedCard) openSwipedCard = null;
+  if (activeNoteId === id) closeEditor();
+  persist();
   renderAll();
 }
 
@@ -334,10 +484,12 @@ function renderSubtasks() {
     const li = document.createElement('li');
     li.className = 'sub-item' + (status === 'done' ? ' done' : '');
     li.innerHTML = `
-      <span class="dot dot-${status}" title="${statusLabel(status)} – Klick zum Wechseln"></span>
+      <span class="dot dot-${status}" title="${statusLabel(status)} ${t('clickToCycle')}"></span>
       <input class="sub-text" type="text" value="" />
-      ${noteShared ? whoBadge(st) : ''}
-      <button class="sub-del" title="Teilaufgabe löschen">✕</button>`;
+      ${st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : ''}
+      ${noteShared ? whoBadge(note, st) : ''}
+      <button class="sub-photo" title="${t(st.photo ? 'photo' : 'addPhoto')}">📷</button>
+      <button class="sub-del" title="${t('deleteSubtask')}">✕</button>`;
     const input = li.querySelector('.sub-text');
     input.value = st.text || '';
     li.querySelector('.dot').onclick = () => cycleSubtask(st.id);
@@ -352,6 +504,9 @@ function renderSubtasks() {
         $('subAddInput').focus();
       }
     };
+    li.querySelector('.sub-photo').onclick = () => pickSubtaskPhoto(st.id);
+    const thumb = li.querySelector('.sub-thumb');
+    if (thumb) thumb.onclick = () => openPhoto(st.id);
     li.querySelector('.sub-del').onclick = () => deleteSubtask(st.id);
     listEl.appendChild(li);
   });
@@ -365,7 +520,7 @@ function renderSubtasks() {
 function updateSubProgress(note) {
   const subs = note.subtasks || [];
   const done = subs.filter((s) => (s.status || 'todo') === 'done').length;
-  $('subProgress').textContent = subs.length ? `${done}/${subs.length} erledigt` : '';
+  $('subProgress').textContent = subs.length ? t('progressDone', { done, total: subs.length }) : '';
 }
 
 let subSaveTimer = null;
@@ -406,12 +561,12 @@ function cycleSubtask(stId) {
   renderNoteList();
 }
 
-function whoBadge(st) {
+function whoBadge(note, st) {
   if (!st.updatedBy) return '';
   const mine = st.updatedBy.id === NZDevice.getId();
-  const who = mine ? 'du' : st.updatedBy.nickname || 'jemand';
-  const color = st.updatedBy.color || 'var(--text-faint)';
-  return `<span class="sub-who" style="color:${color}" title="zuletzt geändert von ${escapeHtml(who)}">● ${escapeHtml(who)}</span>`;
+  const who = mine ? t('you') : st.updatedBy.nickname || t('someone');
+  const color = NZ.noteColorFor(note, st.updatedBy.id) || st.updatedBy.color || 'var(--text-faint)';
+  return `<span class="sub-who" style="color:${color}" title="${t('lastChangedBy', { who: escapeHtml(who) })}">● ${escapeHtml(who)}</span>`;
 }
 
 function deleteSubtask(stId) {
@@ -425,9 +580,119 @@ function deleteSubtask(stId) {
   renderNoteList();
 }
 
+// ---- Foto pro Teilaufgabe (optional) ----
+let photoTargetId = null;
+
+function findSub(stId) {
+  const note = currentNote();
+  return note && (note.subtasks || []).find((s) => s.id === stId);
+}
+
+async function pickSubtaskPhoto(stId) {
+  photoTargetId = stId;
+  // Handy-App: nativer Dialog „Foto aufnehmen / Aus Galerie".
+  if (window.NZNative && NZNative.cameraAvailable && NZNative.cameraAvailable()) {
+    try {
+      const dataUrl = await NZNative.takePhoto({
+        header: t('photoHeader'),
+        camera: t('takePhoto'),
+        gallery: t('fromGallery'),
+        cancel: t('cancel')
+      });
+      if (dataUrl) storeSubtaskPhoto(stId, dataUrl);
+    } catch (e) {
+      const msg = (e && e.message) || '';
+      if (!/cancel/i.test(msg) && msg !== 'no-camera') alert(t('photoFailed') + msg);
+    }
+    return;
+  }
+  // Web/Desktop: Datei-Dialog (am Handy bietet der Browser dort meist auch die Kamera an).
+  const inp = $('subPhotoInput');
+  inp.value = '';
+  inp.click();
+}
+
+function storeSubtaskPhoto(stId, dataUrl) {
+  const st = findSub(stId);
+  if (!st || !dataUrl) return;
+  st.photo = dataUrl;
+  st.updatedBy = NZDevice.me();
+  st.updatedAt = Date.now();
+  const note = currentNote();
+  if (note) note.updatedAt = Date.now();
+  persist();
+  renderSubtasks();
+}
+
+async function onSubPhotoChosen(file) {
+  if (!file || !findSub(photoTargetId)) return;
+  try {
+    storeSubtaskPhoto(photoTargetId, await downscaleImage(file, 900, 0.5));
+  } catch (e) {
+    alert(t('photoFailed') + (e.message || e));
+  }
+}
+
+// Bild verkleinern & als JPEG-DataURL zurückgeben (klein halten → synct mit der Notiz).
+function downscaleImage(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        if (w > h && w > maxDim) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else if (h > maxDim) {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        let q = quality;
+        let url = canvas.toDataURL('image/jpeg', q);
+        while (url.length > 220000 && q > 0.3) {
+          q -= 0.1;
+          url = canvas.toDataURL('image/jpeg', q);
+        }
+        resolve(url);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function openPhoto(stId) {
+  const st = findSub(stId);
+  if (!st || !st.photo) return;
+  photoTargetId = stId;
+  $('photoImg').src = st.photo;
+  $('photoModal').classList.remove('hidden');
+}
+
+function removePhoto() {
+  const st = findSub(photoTargetId);
+  if (st) {
+    st.photo = null;
+    st.updatedAt = Date.now();
+    const note = currentNote();
+    if (note) note.updatedAt = Date.now();
+    persist();
+    renderSubtasks();
+  }
+  $('photoModal').classList.add('hidden');
+}
+
 // ---- Folders ----
 function newFolder() {
-  const name = prompt('Name des neuen Ordners:');
+  const name = prompt(t('newFolderPrompt'));
   if (!name || !name.trim()) return;
   const clean = name.trim();
   if (data.folders.includes(clean)) return;
@@ -437,7 +702,7 @@ function newFolder() {
 }
 
 function deleteFolder(name) {
-  if (!confirm(`Ordner "${name}" löschen? (Notizen bleiben erhalten)`)) return;
+  if (!confirm(t('deleteFolderConfirm', { name }))) return;
   data.folders = data.folders.filter((f) => f !== name);
   data.notes.forEach((n) => {
     if (n.folder === name) n.folder = '';
@@ -447,78 +712,70 @@ function deleteFolder(name) {
   renderAll();
 }
 
-// ---- Markdown / preview ----
-function showEditMode() {
-  bodyInput.classList.remove('hidden');
-  previewEl.classList.add('hidden');
-  $('previewToggle').classList.remove('active');
+// ---- Textfeld mit Autoren-Farben (wer hat welche Zeile geschrieben) ----
+// Farbansicht nur bei geteilten Notizen; allein bleibt es ein schlichtes Textfeld.
+function isBodyColored(note) {
+  return !!(note && note.share && note.share.code);
 }
 
-function togglePreview() {
-  const isPreview = !previewEl.classList.contains('hidden');
-  if (isPreview) {
-    showEditMode();
-  } else {
-    previewEl.innerHTML = renderMarkdown(bodyInput.value);
-    bodyInput.classList.add('hidden');
-    previewEl.classList.remove('hidden');
-    $('previewToggle').classList.add('active');
+function ensureBodyLines(note) {
+  if (!note) return [];
+  if (!note.bodyLines) note.bodyLines = NZ.textToLines(note.body || '');
+  return note.bodyLines;
+}
+
+function renderBodyColored(note) {
+  ensureBodyLines(note);
+  const lines = note.bodyLines;
+  const empty = !lines.length || (lines.length === 1 && lines[0].text === '');
+  if (empty) {
+    bodyColoredEl.innerHTML = `<div class="body-empty">${escapeHtml(t('bodyPlaceholder'))}</div>`;
+    return;
   }
-}
-
-function renderMarkdown(src) {
-  let html = escapeHtml(src);
-  html = html.replace(/^# (.*)$/gm, '<h1>$1</h1>');
-  html = html.replace(/^## (.*)$/gm, '<h2>$1</h2>');
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/`(.+?)`/g, '<code>$1</code>');
-  html = html.replace(/^[-*] (.*)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>');
-  html = html
-    .split(/\n{2,}/)
-    .map((block) =>
-      /^\s*<(h1|h2|ul|li)/.test(block.trim()) ? block : `<p>${block.replace(/\n/g, '<br/>')}</p>`
-    )
+  bodyColoredEl.innerHTML = lines
+    .map((l) => {
+      const text = l.text === '' ? '<br/>' : escapeHtml(l.text);
+      const color = NZ.noteColorFor(note, l.by) || l.color;
+      if (l.by && color) {
+        const tip = l.name ? t('writtenBy', { who: escapeHtml(l.name) }) : '';
+        return `<div class="bl" style="--c:${color}" title="${tip}">${text}</div>`;
+      }
+      return `<div class="bl bl-none">${text}</div>`;
+    })
     .join('');
-  return html;
 }
 
-function applyFormat(fmt) {
-  const ta = bodyInput;
-  const start = ta.selectionStart;
-  const end = ta.selectionEnd;
-  const sel = ta.value.slice(start, end);
-  const wraps = {
-    bold: ['**', '**'],
-    italic: ['*', '*'],
-    code: ['`', '`']
-  };
-  const lines = {
-    h1: '# ',
-    list: '- '
-  };
-  let newText;
-  let cursor;
-  if (wraps[fmt]) {
-    const [a, b] = wraps[fmt];
-    newText = ta.value.slice(0, start) + a + (sel || 'Text') + b + ta.value.slice(end);
-    cursor = start + a.length + (sel || 'Text').length + b.length;
-  } else if (lines[fmt]) {
-    const lineStart = ta.value.lastIndexOf('\n', start - 1) + 1;
-    newText = ta.value.slice(0, lineStart) + lines[fmt] + ta.value.slice(lineStart);
-    cursor = end + lines[fmt].length;
+// 'edit' = Textfeld zum Tippen, 'view' = farbige Autoren-Ansicht.
+function showBodyMode(mode) {
+  const edit = mode === 'edit';
+  bodyInput.classList.toggle('hidden', !edit);
+  bodyColoredEl.classList.toggle('hidden', edit);
+}
+
+function setupBodyFor(note) {
+  bodyInput.value = note.body || '';
+  ensureBodyLines(note);
+  if (isBodyColored(note)) {
+    renderBodyColored(note);
+    showBodyMode('view');
+    $('bodyHint').classList.remove('hidden');
+  } else {
+    showBodyMode('edit');
+    $('bodyHint').classList.add('hidden');
   }
-  ta.value = newText;
-  ta.focus();
-  ta.setSelectionRange(cursor, cursor);
-  scheduleSave();
+}
+
+// Remote-Änderung am offenen Textfeld übernehmen (nur wenn ich nicht gerade selbst tippe).
+function syncBodyFromRemote(note) {
+  if (document.activeElement === bodyInput) return;
+  bodyInput.value = note.body || '';
+  if (isBodyColored(note)) renderBodyColored(note);
 }
 
 // ---- Theme ----
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
-  $('themeToggle').textContent = theme === 'dark' ? '🌙 Dark' : '☀️ Light';
+  $('themeToggle').textContent = theme === 'dark' ? t('themeDark') : t('themeLight');
   localStorage.setItem('theme', theme);
 }
 
@@ -558,11 +815,150 @@ async function openShare() {
   const note = currentNote();
   if (!note) return;
   if (!cloudReady()) {
-    alert('Teilen braucht Internet/Cloud. Sobald du online bist, wird die Notiz geteilt.');
+    alert(t('needCloud'));
     return;
   }
   showShareModal(true);
   renderShareState(note);
+  $('inviteUser').value = '';
+  $('inviteMsg').classList.add('hidden');
+  renderFriendChips();
+}
+
+// ---- Teilen per @Nutzername (Anfrage senden) ----
+function showSmallMsg(el, text, isErr) {
+  el.textContent = text;
+  el.classList.toggle('err', !!isErr);
+  el.classList.remove('hidden');
+}
+
+// Einladung an eine konkrete uid senden (von @Name-Eingabe ODER Freund-Chip).
+async function doSendInvite(toUid, label) {
+  const note = currentNote();
+  const msg = $('inviteMsg');
+  if (!note || !cloudReady() || !window.NZInvites) return;
+  try {
+    const myProfile = await NZProfile.getMyProfile();
+    const fromName = myProfile && myProfile.username ? '@' + myProfile.username : NZDevice.me().nickname;
+    await NZInvites.sendInvite(note, toUid, fromName);
+    note.shared = true;
+    persist();
+    renderShareState(note);
+    renderNoteList();
+    updateSharedBadge(note);
+    setupBodyFor(note);
+    showSmallMsg(msg, t('inviteSent', { name: label || '' }), false);
+  } catch (e) {
+    showSmallMsg(msg, e.message === 'self' ? t('inviteSelf') : t('errGeneric') + (e.message || e), true);
+  }
+}
+
+async function sendInviteToUser() {
+  const msg = $('inviteMsg');
+  msg.classList.add('hidden');
+  if (!cloudReady() || !window.NZProfile) return;
+  if (!NZProfile.cleanUsername($('inviteUser').value)) return showSmallMsg(msg, t('inviteNeedName'), true);
+  $('inviteSendBtn').disabled = true;
+  try {
+    const user = await NZProfile.findUser($('inviteUser').value);
+    if (!user) {
+      showSmallMsg(msg, t('inviteUserNotFound'), true);
+      return;
+    }
+    await doSendInvite(user.uid, '@' + user.username);
+    $('inviteUser').value = '';
+  } finally {
+    $('inviteSendBtn').disabled = false;
+  }
+}
+
+// ---- Freundesliste ----
+function friendLabel(f) {
+  return (f.alias && f.alias.trim()) || '@' + (f.friend_username || '?');
+}
+async function renderFriendChips() {
+  if (!window.NZFriends || !cloudReady()) {
+    $('friendsShare').classList.add('hidden');
+    return;
+  }
+  let friends = [];
+  try {
+    friends = await NZFriends.listFriends();
+  } catch {}
+  const box = $('friendChips');
+  box.innerHTML = '';
+  $('friendsShare').classList.toggle('hidden', friends.length === 0);
+  friends.forEach((f) => {
+    const b = document.createElement('button');
+    b.className = 'friend-chip';
+    b.textContent = friendLabel(f);
+    b.onclick = () => {
+      $('inviteMsg').classList.add('hidden');
+      doSendInvite(f.friend_uid, friendLabel(f));
+    };
+    box.appendChild(b);
+  });
+}
+
+function openFriends() {
+  if (!cloudReady()) return alert(t('needCloud'));
+  $('addFriendInput').value = '';
+  $('addFriendAlias').value = '';
+  $('addFriendMsg').classList.add('hidden');
+  renderFriendsList();
+  $('friendsModal').classList.remove('hidden');
+}
+async function renderFriendsList() {
+  const ul = $('friendsList');
+  ul.innerHTML = '';
+  let friends = [];
+  try {
+    friends = await NZFriends.listFriends();
+  } catch {}
+  if (!friends.length) {
+    ul.innerHTML = `<li class="friends-empty">${escapeHtml(t('noFriends'))}</li>`;
+    return;
+  }
+  friends.forEach((f) => {
+    const li = document.createElement('li');
+    li.className = 'friend-row';
+    li.innerHTML = `
+      <input class="friend-alias" type="text" />
+      <span class="friend-handle">@${escapeHtml(f.friend_username || '')}</span>
+      <button class="friend-del" title="${t('remove')}">✕</button>`;
+    const inp = li.querySelector('.friend-alias');
+    inp.value = f.alias || '';
+    inp.placeholder = t('aliasPlaceholder');
+    inp.onchange = async () => {
+      await NZFriends.setFriendAlias(f.friend_uid, inp.value);
+      renderFriendChips();
+    };
+    li.querySelector('.friend-del').onclick = async () => {
+      await NZFriends.removeFriend(f.friend_uid);
+      renderFriendsList();
+      renderFriendChips();
+    };
+    ul.appendChild(li);
+  });
+}
+async function addFriendFromInput() {
+  const msg = $('addFriendMsg');
+  msg.classList.add('hidden');
+  if (!window.NZProfile || !NZProfile.cleanUsername($('addFriendInput').value)) return;
+  $('addFriendBtn').disabled = true;
+  try {
+    await NZFriends.addFriend($('addFriendInput').value, $('addFriendAlias').value);
+    $('addFriendInput').value = '';
+    $('addFriendAlias').value = '';
+    renderFriendsList();
+    renderFriendChips();
+  } catch (e) {
+    const m =
+      e.message === 'not-found' ? t('inviteUserNotFound') : e.message === 'self' ? t('inviteSelf') : t('errGeneric') + (e.message || e);
+    showSmallMsg(msg, m, true);
+  } finally {
+    $('addFriendBtn').disabled = false;
+  }
 }
 
 async function doShare() {
@@ -573,12 +969,14 @@ async function doShare() {
   try {
     await window.NZShare.shareNote(note);
     note.shared = true;
+    NZ.claimNoteColor(note, NZDevice.getId()); // feste Farbe für diese Notiz
     persist();
     renderShareState(note);
     renderNoteList();
     updateSharedBadge(note);
+    setupBodyFor(note); // ab jetzt farbige Autoren-Ansicht
   } catch (e) {
-    alert('Teilen fehlgeschlagen: ' + (e.message || e));
+    alert(t('shareFailed') + (e.message || e));
   } finally {
     $('shareBusy').classList.add('hidden');
     $('doShareBtn').disabled = false;
@@ -588,7 +986,7 @@ async function doShare() {
 async function doUnshare() {
   const note = currentNote();
   if (!note || !cloudReady()) return;
-  if (!confirm('Teilen beenden? Andere verlieren den Zugriff.')) return;
+  if (!confirm(t('stopSharingConfirm'))) return;
   try {
     await window.NZShare.unshareNote(note);
     note.shared = false;
@@ -596,8 +994,9 @@ async function doUnshare() {
     renderShareState(note);
     renderNoteList();
     updateSharedBadge(note);
+    setupBodyFor(note); // zurück zum schlichten Textfeld
   } catch (e) {
-    alert('Fehler: ' + (e.message || e));
+    alert(t('errGeneric') + (e.message || e));
   }
 }
 
@@ -605,7 +1004,7 @@ function updateSharedBadge(note) {
   const shared = !!(note && note.share && note.share.code);
   $('sharedBadge').classList.toggle('hidden', !shared);
   $('sharedBadge').textContent = shared
-    ? (note.ownedByMe === false ? '🔗 Geteilt (von jemandem)' : '🔗 Geteilt · ' + note.share.code)
+    ? (note.ownedByMe === false ? t('sharedBy') : t('shared') + ' · ' + note.share.code)
     : '';
 }
 
@@ -631,18 +1030,19 @@ function renderPresence(list) {
     row.classList.add('hidden');
     return;
   }
+  const note = currentNote();
   const dots = people
-    .map((p) => `<span class="pres-dot" style="background:${p.color || '#888'}" title="${escapeHtml(p.nickname || '')}"></span>`)
+    .map((p) => `<span class="pres-dot" style="background:${NZ.noteColorFor(note, p.id) || p.color || '#888'}" title="${escapeHtml(p.nickname || '')}"></span>`)
     .join('');
-  row.innerHTML = `${dots}<span class="pres-text">${people.length} online</span>`;
+  row.innerHTML = `${dots}<span class="pres-text">${t('online', { n: people.length })}</span>`;
   row.classList.remove('hidden');
 }
 
 // Desktop-Benachrichtigung bei Änderung einer geteilten Notiz.
 function notifyChange(title) {
   try {
-    new Notification('NotizApp 🔗', {
-      body: (title ? '„' + title + '" ' : 'Eine geteilte Notiz ') + 'wurde aktualisiert.'
+    new Notification('SmartNote 🔗', {
+      body: title ? t('noteUpdated', { title }) : t('genericUpdated')
     });
   } catch {}
 }
@@ -665,7 +1065,7 @@ function parseCode(raw) {
 
 async function doJoin() {
   if (!cloudReady()) {
-    alert('Beitreten braucht Internet/Cloud.');
+    alert(t('joinNeedCloud'));
     return;
   }
   const code = parseCode($('joinInput').value);
@@ -678,11 +1078,16 @@ async function doJoin() {
       return;
     }
     data = await NZStore.load();
+    const joined = data.notes.find((n) => n.id === noteId);
+    if (joined && joined.share) {
+      NZ.claimNoteColor(joined, NZDevice.getId()); // eigene feste Farbe für diese Notiz
+      persist();
+    }
     renderAll();
     showJoinModal(false);
     openNote(noteId);
   } catch (e) {
-    alert('Beitreten fehlgeschlagen: ' + (e.message || e));
+    alert(t('joinFailed') + (e.message || e));
   } finally {
     $('doJoinBtn').disabled = false;
   }
@@ -704,7 +1109,7 @@ async function updateAccountUI() {
     const info = await NZAuth.getAuthInfo();
     $('accountBtn')._secured = info.secured;
     $('accountBtn')._email = info.email;
-    $('accountBtn').textContent = info.secured ? '✓ ' + info.email : '🔒 Notizen sichern';
+    $('accountBtn').textContent = info.secured ? '✓ ' + info.email : t('backup');
     $('accountBtn').classList.toggle('secured', info.secured);
   } catch {}
 }
@@ -713,39 +1118,39 @@ function renderAuthMode() {
   const secured = $('accountBtn')._secured;
   const formIds = ['authEmail', 'authPassword', 'authSubmit'];
   if (secured) {
-    $('authTitle').textContent = '✓ Notizen gesichert';
+    $('authTitle').textContent = t('securedTitle');
     $('authHint').classList.add('hidden');
+    $('oauthRow').classList.add('hidden');
     formIds.forEach((id) => $(id).classList.add('hidden'));
     document.querySelector('.auth-switch').classList.add('hidden');
     $('authSignedIn').classList.remove('hidden');
-    $('authSignedInText').textContent =
-      'Angemeldet als ' + ($('accountBtn')._email || '') + '. Deine Notizen sind gesichert und auf allen Geräten gleich.';
+    $('authSignedInText').textContent = t('signedInAs', { email: $('accountBtn')._email || '' });
     return;
   }
   $('authHint').classList.remove('hidden');
+  $('oauthRow').classList.remove('hidden');
   formIds.forEach((id) => $(id).classList.remove('hidden'));
   document.querySelector('.auth-switch').classList.remove('hidden');
   $('authSignedIn').classList.add('hidden');
   $('authError').classList.add('hidden');
   if (authMode === 'secure') {
-    $('authTitle').textContent = '🔒 Notizen sichern';
-    $('authHint').textContent =
-      'Sichere deine Notizen mit E-Mail + Passwort. So bleiben sie dauerhaft erhalten – auch nach Neustart oder Neuinstallation – und sind auf allen deinen Geräten gleich.';
-    $('authSubmit').textContent = 'Notizen sichern';
-    $('authSwitchText').textContent = 'Schon ein Konto?';
-    $('authSwitchLink').textContent = 'Anmelden';
+    $('authTitle').textContent = t('backupTitleModal');
+    $('authHint').textContent = t('backupHint');
+    $('authSubmit').textContent = t('backupBtn');
+    $('authSwitchText').textContent = t('haveAccount');
+    $('authSwitchLink').textContent = t('signIn');
   } else {
-    $('authTitle').textContent = '⮕ Anmelden';
-    $('authHint').textContent = 'Melde dich an, um deine gesicherten Notizen auf diesem Gerät zu laden.';
-    $('authSubmit').textContent = 'Anmelden';
-    $('authSwitchText').textContent = 'Noch kein Konto?';
-    $('authSwitchLink').textContent = 'Notizen sichern';
+    $('authTitle').textContent = t('signInTitle');
+    $('authHint').textContent = t('signInHint');
+    $('authSubmit').textContent = t('signIn');
+    $('authSwitchText').textContent = t('noAccountYet');
+    $('authSwitchLink').textContent = t('backupBtn');
   }
 }
 
 function openAuth() {
   if (!authAvailable()) {
-    alert('Sichern braucht Internet/Cloud.');
+    alert(t('backupNeedCloud'));
     return;
   }
   authMode = 'secure';
@@ -753,6 +1158,7 @@ function openAuth() {
   $('authPassword').value = '';
   $('authError').classList.add('hidden');
   renderAuthMode();
+  loadUsernameField();
   $('authModal').classList.remove('hidden');
 }
 
@@ -763,25 +1169,25 @@ function showAuthError(msg) {
 
 function translateAuthError(e) {
   const m = ((e && e.message) || '').toLowerCase();
-  if (m.includes('registered')) return 'Diese E-Mail ist schon vergeben. Nutze unten „Anmelden".';
-  if (m.includes('invalid login') || m.includes('credentials')) return 'E-Mail oder Passwort falsch.';
-  if (m.includes('password')) return 'Passwort zu kurz (mind. 6 Zeichen).';
-  if (m.includes('email')) return 'Bitte eine gültige E-Mail eingeben.';
-  return 'Fehler: ' + ((e && e.message) || e);
+  if (m.includes('registered')) return t('errEmailTaken');
+  if (m.includes('invalid login') || m.includes('credentials')) return t('errBadLogin');
+  if (m.includes('password')) return t('errPw');
+  if (m.includes('email')) return t('errEmail');
+  return t('errGeneric') + ((e && e.message) || e);
 }
 
 async function submitAuth() {
   const email = $('authEmail').value.trim();
   const password = $('authPassword').value;
-  if (!email || !password) return showAuthError('Bitte E-Mail und Passwort eingeben.');
-  if (password.length < 6) return showAuthError('Passwort muss mind. 6 Zeichen haben.');
+  if (!email || !password) return showAuthError(t('fillEmailPw'));
+  if (password.length < 6) return showAuthError(t('pwTooShort'));
   $('authSubmit').disabled = true;
   try {
     if (authMode === 'secure') {
       await NZAuth.secureWithEmail(email, password);
       $('authModal').classList.add('hidden');
       await updateAccountUI();
-      alert('✓ Notizen gesichert! Du kannst dich jetzt auf anderen Geräten mit dieser E-Mail anmelden.');
+      alert(t('backedUp'));
     } else {
       await NZAuth.signInEmail(email, password);
       location.reload(); // mit dem Konto neu laden (lädt dessen Notizen)
@@ -794,21 +1200,127 @@ async function submitAuth() {
 }
 
 async function signOutAccount() {
-  if (!confirm('Abmelden? Auf diesem Gerät startest du dann wieder anonym.')) return;
+  if (!confirm(t('signOutConfirm'))) return;
   await NZAuth.signOutUser();
   location.reload();
 }
 
-// ---- KI (Liste erstellen / Einkauf sortieren) ----
+// ---- @Nutzername (Profil) ----
+async function loadUsernameField() {
+  if (!authAvailable() || !window.NZProfile) return;
+  $('profileBox').classList.remove('hidden');
+  $('usernameMsg').classList.add('hidden');
+  try {
+    const p = await NZProfile.getMyProfile();
+    $('usernameInput').value = p && p.username ? '@' + p.username : '';
+  } catch {}
+}
+async function saveUsername() {
+  const msg = $('usernameMsg');
+  msg.classList.add('hidden');
+  $('usernameSave').disabled = true;
+  try {
+    const info = window.NZAuth ? await NZAuth.getAuthInfo() : null;
+    const display = (info && info.email) || NZDevice.me().nickname;
+    const uname = await NZProfile.setUsername($('usernameInput').value, display);
+    $('usernameInput').value = '@' + uname;
+    showSmallMsg(msg, t('usernameSaved'), false);
+  } catch (e) {
+    const m =
+      e.message === 'too-short' ? t('usernameTooShort') : e.message === 'taken' ? t('usernameTaken') : t('errGeneric') + (e.message || e);
+    showSmallMsg(msg, m, true);
+  } finally {
+    $('usernameSave').disabled = false;
+  }
+}
+
+// ---- Eingehende Notiz-Anfragen ----
+let inviteQueue = [];
+let inviteShowing = null;
+function enqueueInvite(inv) {
+  if (!inv) return;
+  if ((inviteShowing && inviteShowing.id === inv.id) || inviteQueue.some((i) => i.id === inv.id)) return;
+  inviteQueue.push(inv);
+  showNextInvite();
+}
+function showNextInvite() {
+  if (inviteShowing || !inviteQueue.length) return;
+  inviteShowing = inviteQueue.shift();
+  $('inviteText').textContent = t('inviteRequestText', {
+    who: inviteShowing.from_name || t('someone'),
+    title: (inviteShowing.note_title || '').trim() || t('untitled')
+  });
+  $('inviteModal').classList.remove('hidden');
+}
+function closeInvite() {
+  $('inviteModal').classList.add('hidden');
+  inviteShowing = null;
+  setTimeout(showNextInvite, 250);
+}
+async function acceptCurrentInvite() {
+  const inv = inviteShowing;
+  if (!inv) return;
+  $('inviteAccept').disabled = true;
+  try {
+    const noteId = await NZInvites.acceptInvite(inv);
+    data = await NZStore.load();
+    renderAll();
+    closeInvite();
+    if (noteId) openNote(noteId);
+    showToast(t('inviteAcceptedToast', { title: (inv.note_title || '').trim() || t('untitled') }));
+  } catch (e) {
+    alert(t('errGeneric') + (e.message || e));
+  } finally {
+    $('inviteAccept').disabled = false;
+  }
+}
+async function declineCurrentInvite() {
+  const inv = inviteShowing;
+  if (!inv) return;
+  try {
+    await NZInvites.declineInvite(inv);
+  } catch {}
+  closeInvite();
+}
+
+// ---- Anmelden mit Google / Apple ----
+async function signInWithProvider(which) {
+  if (!authAvailable()) return alert(t('backupNeedCloud'));
+  const btn = which === 'apple' ? $('appleSignInBtn') : $('googleSignInBtn');
+  btn.disabled = true;
+  $('authError').classList.add('hidden');
+  try {
+    await (which === 'apple' ? NZAuth.signInWithApple() : NZAuth.signInWithGoogle());
+    // Web: Browser leitet weiter (Seite lädt neu zurück). Native: System-Browser offen,
+    // Rückkehr läuft über onAuthCallback → dort wird neu geladen.
+  } catch (e) {
+    showAuthError(t('oauthFailed') + (e.message || e));
+    btn.disabled = false;
+  }
+}
+
+// Native Rückleitung aus dem Browser (smartnote://login-callback) abschließen.
+if (window.NZNative && NZNative.onAuthCallback) {
+  NZNative.onAuthCallback(async (url) => {
+    try {
+      const ok = await NZAuth.completeOAuth(url);
+      if (ok) location.reload(); // mit dem neuen Konto laden
+    } catch (e) {
+      alert(t('oauthFailed') + (e.message || e));
+    }
+  });
+}
+
+// ---- KI (Einkauf sortieren / Sprachnotiz) ----
 function aiAvailable() {
   return !!(window.NZAI && NZAI.available() && NZStore.kind === 'supabase');
 }
 
 function createNoteFromAI(title, items) {
   const note = NZ.makeNote({
-    title: title || 'Neue Liste',
+    title: title || t('newList'),
     folder: currentFolder === '__all__' ? '' : currentFolder,
-    tags: currentTag ? [currentTag] : []
+    tags: []
   });
   note.subtasks = (items || []).map((t) => NZ.makeSubtask(t, NZDevice.me()));
   applyAutoStatus(note);
@@ -818,33 +1330,13 @@ function createNoteFromAI(title, items) {
   openNote(note.id);
 }
 
-async function aiGenerate() {
-  const prompt = $('aiInput').value.trim();
-  if (!prompt) return;
-  $('aiSubmit').disabled = true;
-  const oldT = $('aiSubmit').textContent;
-  $('aiSubmit').textContent = '✨ Erstelle…';
-  $('aiError').classList.add('hidden');
-  try {
-    const res = await NZAI.generate(prompt);
-    $('aiModal').classList.add('hidden');
-    createNoteFromAI(res.title, res.items);
-  } catch (e) {
-    $('aiError').textContent = 'Fehler: ' + (e.message || e);
-    $('aiError').classList.remove('hidden');
-  } finally {
-    $('aiSubmit').disabled = false;
-    $('aiSubmit').textContent = oldT;
-  }
-}
-
 async function aiSort() {
   const note = currentNote();
   if (!note || !(note.subtasks || []).length) return;
   const btn = $('sortBtn');
   btn.disabled = true;
   const oldT = btn.textContent;
-  btn.textContent = '✨ …';
+  btn.textContent = t('sorting');
   try {
     const res = await NZAI.sort(note.subtasks.map((s) => s.text));
     const norm = (s) => (s || '').trim().toLowerCase();
@@ -863,11 +1355,89 @@ async function aiSort() {
     renderSubtasks();
     renderNoteList();
   } catch (e) {
-    alert('Sortieren fehlgeschlagen: ' + (e.message || e));
+    alert(t('sortFailed') + (e.message || e));
   } finally {
     btn.disabled = false;
     btn.textContent = oldT;
   }
+}
+
+// ---- Sprach-Teilen: gesprochenen Namen gegen die Freundesliste matchen ----
+function normName(s) {
+  return (s || '').toLowerCase().trim().replace(/[^a-z0-9äöüß ]/g, '');
+}
+function lev(a, b) {
+  const m = a.length;
+  const n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const d = Array.from({ length: m + 1 }, (_, i) => [i, ...new Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+    }
+  }
+  return d[m][n];
+}
+function scoreName(cand, q) {
+  if (!cand || !q) return 0;
+  if (cand === q) return 100;
+  if (cand.startsWith(q) || q.startsWith(cand)) return 85;
+  if (cand.includes(q) || q.includes(cand)) return 72;
+  const dist = lev(cand, q);
+  const max = Math.max(cand.length, q.length) || 1;
+  return Math.max(0, 100 - (dist / max) * 100);
+}
+function matchFriend(spoken, friends) {
+  const q = normName(spoken);
+  if (!q) return null;
+  let best = null;
+  let bestScore = 0;
+  (friends || []).forEach((f) => {
+    [f.alias, f.friend_username].filter(Boolean).forEach((c) => {
+      const s = scoreName(normName(c), q);
+      if (s > bestScore) {
+        bestScore = s;
+        best = f;
+      }
+    });
+  });
+  return bestScore >= 62 ? best : null;
+}
+
+// Nach einer Sprachnotiz mit "teile mit X": Dialog zum Bestätigen/Auswählen.
+async function promptVoiceShare(spoken) {
+  const note = currentNote();
+  if (!note || !cloudReady() || !window.NZFriends) return;
+  let friends = [];
+  try {
+    friends = await NZFriends.listFriends();
+  } catch {}
+  if (!friends.length) return; // keine Freunde → nichts vorzuschlagen
+  const matched = matchFriend(spoken, friends);
+  $('voiceShareText').textContent = matched
+    ? t('voiceShareMatched', { spoken, name: friendLabel(matched) })
+    : t('voiceSharePick', { spoken });
+  const box = $('voiceShareChips');
+  box.innerHTML = '';
+  const ordered = matched ? [matched, ...friends.filter((f) => f.friend_uid !== matched.friend_uid)] : friends;
+  ordered.forEach((f) => {
+    const b = document.createElement('button');
+    b.className = 'friend-chip' + (matched && f.friend_uid === matched.friend_uid ? ' matched' : '');
+    b.textContent = friendLabel(f);
+    b.onclick = async () => {
+      closeVoiceShare();
+      await doSendInvite(f.friend_uid, friendLabel(f));
+      showToast(t('inviteSent', { name: friendLabel(f) }));
+    };
+    box.appendChild(b);
+  });
+  $('voiceShareModal').classList.remove('hidden');
+}
+function closeVoiceShare() {
+  $('voiceShareModal').classList.add('hidden');
 }
 
 // ---- Sprachnotiz (aufnehmen -> Whisper -> KI-Liste) ----
@@ -875,6 +1445,24 @@ let mediaRecorder = null;
 let audioChunks = [];
 let voiceTimer = null;
 let voiceSeconds = 0;
+let voiceTargetId = null; // null = neue Notiz; sonst füllt es diese offene Notiz
+
+// Ergebnis in eine bestehende, offene Notiz einfüllen (Titel nur wenn leer; Punkte anhängen).
+function fillNoteFromVoice(noteId, title, items) {
+  const note = data.notes.find((n) => n.id === noteId);
+  if (!note) return createNoteFromAI(title, items);
+  if (!note.title || !note.title.trim()) note.title = title || '';
+  if (!note.subtasks) note.subtasks = [];
+  (items || []).forEach((text) => note.subtasks.push(NZ.makeSubtask(text, NZDevice.me())));
+  applyAutoStatus(note);
+  note.updatedAt = Date.now();
+  persist();
+  if (activeNoteId === noteId) {
+    titleInput.value = note.title || '';
+    renderSubtasks();
+  }
+  renderNoteList();
+}
 
 function micSupported() {
   return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
@@ -884,8 +1472,9 @@ function showVoiceError(msg) {
   $('voiceError').classList.remove('hidden');
 }
 
-async function startVoice() {
+async function startVoice(targetId) {
   if (!aiAvailable()) return;
+  voiceTargetId = typeof targetId === 'string' ? targetId : null;
   $('voiceError').classList.add('hidden');
   $('voiceProcessing').classList.add('hidden');
   $('voiceRecording').classList.remove('hidden');
@@ -914,7 +1503,7 @@ async function startVoice() {
     }, 1000);
   } catch (e) {
     $('voiceRecording').classList.add('hidden');
-    showVoiceError('Mikrofon nicht verfügbar oder abgelehnt.');
+    showVoiceError(t('micDenied'));
   }
 }
 
@@ -941,44 +1530,49 @@ async function processVoice(blob) {
     fd.append('file', blob, 'audio.' + ext);
     const res = await NZAI.voice(fd);
     $('voiceModal').classList.add('hidden');
-    createNoteFromAI(res.title, res.items);
+    if (voiceTargetId && data.notes.find((n) => n.id === voiceTargetId)) {
+      fillNoteFromVoice(voiceTargetId, res.title, res.items);
+    } else {
+      createNoteFromAI(res.title, res.items);
+    }
+    if (res.shareWith && String(res.shareWith).trim()) promptVoiceShare(res.shareWith);
   } catch (e) {
     $('voiceProcessing').classList.add('hidden');
-    showVoiceError('Fehler: ' + (e.message || e));
+    showVoiceError(t('errGeneric') + (e.message || e));
   }
 }
 
 // ---- Events ----
 $('newNoteBtn').onclick = newNote;
 $('fabNew').onclick = newNote;
-$('voiceBtn').onclick = startVoice;
+$('voiceBtn').onclick = () => startVoice(null);
+$('editVoiceBtn').onclick = () => startVoice(activeNoteId);
 $('voiceStop').onclick = stopVoice;
 $('voiceClose').onclick = closeVoice;
-$('aiBtn').onclick = () => {
-  $('aiInput').value = '';
-  $('aiError').classList.add('hidden');
-  $('aiModal').classList.remove('hidden');
-  setTimeout(() => $('aiInput').focus(), 50);
-};
-$('aiClose').onclick = () => $('aiModal').classList.add('hidden');
-$('aiSubmit').onclick = aiGenerate;
-$('aiInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') aiGenerate();
-});
 $('sortBtn').onclick = aiSort;
-$('aiModal').addEventListener('click', (e) => {
-  if (e.target === $('aiModal')) $('aiModal').classList.add('hidden');
-});
 $('newFolderBtn').onclick = newFolder;
 $('deleteBtn').onclick = deleteNote;
-$('previewToggle').onclick = togglePreview;
 $('themeToggle').onclick = () =>
   applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+if ($('langToggle')) $('langToggle').onclick = toggleLanguage;
 
 titleInput.oninput = scheduleSave;
 bodyInput.oninput = scheduleSave;
-tagsInput.oninput = scheduleSave;
 folderSelect.onchange = scheduleSave;
+
+// Farbansicht antippen → ins Textfeld wechseln; Textfeld verlassen → wieder farbig zeigen.
+bodyColoredEl.onclick = () => {
+  if (!currentNote()) return;
+  showBodyMode('edit');
+  bodyInput.focus();
+};
+bodyInput.addEventListener('blur', () => {
+  const note = currentNote();
+  if (note && isBodyColored(note)) {
+    renderBodyColored(note);
+    showBodyMode('view');
+  }
+});
 
 $('searchInput').oninput = (e) => {
   searchTerm = e.target.value;
@@ -996,8 +1590,12 @@ $('subAddInput').addEventListener('keydown', (e) => {
 });
 $('subAddBtn').onclick = submitSubtask;
 
-document.querySelectorAll('.editor-toolbar [data-fmt]').forEach((btn) => {
-  btn.onclick = () => applyFormat(btn.dataset.fmt);
+// Foto pro Teilaufgabe
+$('subPhotoInput').onchange = (e) => onSubPhotoChosen(e.target.files && e.target.files[0]);
+$('photoClose').onclick = () => $('photoModal').classList.add('hidden');
+$('photoRemove').onclick = removePhoto;
+$('photoModal').addEventListener('click', (e) => {
+  if (e.target === $('photoModal')) $('photoModal').classList.add('hidden');
 });
 
 document.querySelectorAll('.status-opt').forEach((btn) => {
@@ -1039,7 +1637,7 @@ if (window.NZNative && NZNative.scanAvailable()) {
         doJoin();
       }
     } catch (e) {
-      if ((e.message || '') !== 'no-scanner') alert('Scan abgebrochen oder fehlgeschlagen.');
+      if ((e.message || '') !== 'no-scanner') alert(t('scanCancelled'));
     }
   };
 }
@@ -1073,7 +1671,7 @@ document.querySelectorAll('.copy-btn').forEach((btn) => {
     }
     btn.classList.add('copied');
     const old = btn.textContent;
-    btn.textContent = 'Kopiert ✓';
+    btn.textContent = t('copied');
     setTimeout(() => {
       btn.classList.remove('copied');
       btn.textContent = old;
@@ -1091,6 +1689,8 @@ document.querySelectorAll('.copy-btn').forEach((btn) => {
 // ---- Konto-Events ----
 $('accountBtn').onclick = openAuth;
 $('authClose').onclick = () => $('authModal').classList.add('hidden');
+$('googleSignInBtn').onclick = () => signInWithProvider('google');
+$('appleSignInBtn').onclick = () => signInWithProvider('apple');
 $('authSubmit').onclick = submitAuth;
 $('authSignout').onclick = signOutAccount;
 $('authSwitchLink').onclick = (e) => {
@@ -1104,11 +1704,53 @@ $('authPassword').addEventListener('keydown', (e) => {
 $('authModal').addEventListener('click', (e) => {
   if (e.target === $('authModal')) $('authModal').classList.add('hidden');
 });
+
+// ---- Teilen-per-Nutzername-Events ----
+$('usernameSave').onclick = saveUsername;
+$('inviteSendBtn').onclick = sendInviteToUser;
+$('inviteClose').onclick = closeInvite;
+$('inviteAccept').onclick = acceptCurrentInvite;
+$('inviteDecline').onclick = declineCurrentInvite;
+$('inviteUser').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendInviteToUser();
+});
+$('manageFriendsBtn').onclick = openFriends;
+$('friendsBtn').onclick = openFriends;
+$('addFriendBtn').onclick = addFriendFromInput;
+$('addFriendAlias').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') addFriendFromInput();
+});
+$('friendsClose').onclick = () => $('friendsModal').classList.add('hidden');
+$('addFriendInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') addFriendFromInput();
+});
+$('friendsModal').addEventListener('click', (e) => {
+  if (e.target === $('friendsModal')) $('friendsModal').classList.add('hidden');
+});
+$('voiceShareClose').onclick = closeVoiceShare;
+$('voiceShareSkip').onclick = closeVoiceShare;
+$('voiceShareModal').addEventListener('click', (e) => {
+  if (e.target === $('voiceShareModal')) closeVoiceShare();
+});
+$('usernameInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') saveUsername();
+});
+
 NZStore.ready.then(async () => {
   await updateAccountUI();
   if (window.NZAI && NZAI.available() && NZStore.kind === 'supabase') {
-    $('aiBtn').classList.remove('hidden');
-    if (micSupported()) $('voiceBtn').classList.remove('hidden');
+    if (micSupported()) {
+      $('voiceBtn').classList.remove('hidden');
+      $('editVoiceBtn').classList.remove('hidden');
+    }
+  }
+  if (NZStore.kind === 'supabase' && window.NZFriends) $('friendsBtn').classList.remove('hidden');
+  // Eingehende Notiz-Anfragen: offene laden + live lauschen.
+  if (authAvailable() && window.NZInvites) {
+    try {
+      (await NZInvites.pendingInvites()).forEach(enqueueInvite);
+    } catch {}
+    NZInvites.onInvites((inv) => enqueueInvite(inv));
   }
   // Falls von iOS abgemeldet, aber E-Mail bekannt → freundlich zum Anmelden auffordern
   const remembered = window.NZAuth && NZAuth.lastEmail ? NZAuth.lastEmail() : null;
@@ -1117,8 +1759,7 @@ NZStore.ready.then(async () => {
     $('authEmail').value = remembered;
     $('authPassword').value = '';
     renderAuthMode();
-    $('authHint').textContent =
-      'Willkommen zurück! Melde dich an, um deine gesicherten Notizen zu laden.';
+    $('authHint').textContent = t('welcomeBack');
     $('authModal').classList.remove('hidden');
     setTimeout(() => $('authPassword').focus(), 150);
   }
@@ -1137,9 +1778,5 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
     e.preventDefault();
     newNote();
-  }
-  if ((e.ctrlKey || e.metaKey) && document.activeElement === bodyInput) {
-    if (e.key === 'b') { e.preventDefault(); applyFormat('bold'); }
-    if (e.key === 'i') { e.preventDefault(); applyFormat('italic'); }
   }
 });

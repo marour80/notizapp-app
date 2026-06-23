@@ -1,6 +1,6 @@
 {
-  "appId": "com.notizapp.app",
-  "appName": "NotizApp",
+  "appId": "com.smartnote.app",
+  "appName": "SmartNote",
   "webDir": "src",
   "backgroundColor": "#16161e",
   "android": {
