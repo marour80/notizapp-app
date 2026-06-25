@@ -38,7 +38,10 @@ function textFrom(res: any): string {
 async function transcribe(file: any): Promise<string> {
   const key = Deno.env.get('OPENAI_API_KEY');
   if (!key) throw new Error('OPENAI_API_KEY fehlt (Secret in Supabase setzen).');
-  const models = ['whisper-1', 'gpt-4o-mini-transcribe'];
+  // gpt-4o-mini-transcribe ZUERST: genauer + robuster bei mehrsprachigem/undeutlichem Audio
+  // (whisper-1 halluziniert am Audio-Anfang gern ein fremdsprachiges Bruchstück) – und ist sogar günstiger.
+  // whisper-1 bleibt als Fallback, falls das neue Modell mal einen Fehler liefert.
+  const models = ['gpt-4o-mini-transcribe', 'whisper-1'];
   const errs: string[] = [];
   for (const model of models) {
     const fd = new FormData();
@@ -83,7 +86,8 @@ async function generate(client: any, prompt: string, isVoice = false, context: a
     max_tokens: 1024,
     system:
       'Du wandelst die Eingabe in eine übersichtliche Liste um: einen kurzen Titel und passende Teilaufgaben (3–25 knappe Punkte, ohne Nummerierung).\n' +
-      'ANTWORTE IN DERSELBEN SPRACHE wie die Eingabe des Nutzers (z. B. Deutsch auf Deutsch, Englisch auf Englisch). Titel UND Teilaufgaben in dieser Sprache.\n' +
+      'SPRACHE (WICHTIG): Antworte durchgehend in EINER einzigen Sprache – derselben, in der die eigentlichen Inhalte/Aufgaben des Nutzers stehen. Titel, Teilaufgaben UND die Zusammenfassung MÜSSEN in GENAU dieser Sprache sein, niemals teils Deutsch und teils eine andere Sprache. ' +
+      'Falls die Eingabe am Anfang ein einzelnes fremdsprachiges oder unsinniges Bruchstück enthält (typischer Transkriptionsfehler), IGNORIERE es und richte dich nach der Sprache des eigentlichen Inhalts.\n' +
       'ZUSAMMENFASSUNG ("summary"): Schreib in 1 kurzen, freundlichen Satz (in der Sprache des Nutzers), WAS du verstanden hast und gleich tust — z. B. "Ich erstelle die Liste „Wocheneinkauf" mit Milch, Brot und Eiern und teile sie mit Mama." Diese Zusammenfassung wird dem Nutzer zur Bestätigung gezeigt.\n' +
       'TEILEN: Sagt der Nutzer, dass er die Notiz mit jemandem teilen will (z. B. "…und teile das mit Mama", "share this with Anna", "schick das an Papa"), ' +
       'dann schreib NUR den genannten Namen in das Feld "shareWith" (z. B. "Mama", "Anna", "Papa") und lass diesen Teil-mit-Satz aus den Teilaufgaben WEG. ' +
