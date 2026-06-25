@@ -89,9 +89,12 @@ async function generate(client: any, prompt: string, isVoice = false, context: a
       'SPRACHE (WICHTIG): Antworte durchgehend in EINER einzigen Sprache – derselben, in der die eigentlichen Inhalte/Aufgaben des Nutzers stehen. Titel, Teilaufgaben UND die Zusammenfassung MÜSSEN in GENAU dieser Sprache sein, niemals teils Deutsch und teils eine andere Sprache. ' +
       'Falls die Eingabe am Anfang ein einzelnes fremdsprachiges oder unsinniges Bruchstück enthält (typischer Transkriptionsfehler), IGNORIERE es und richte dich nach der Sprache des eigentlichen Inhalts.\n' +
       'ZUSAMMENFASSUNG ("summary"): Schreib in 1 kurzen, freundlichen Satz (in der Sprache des Nutzers), WAS du verstanden hast und gleich tust — z. B. "Ich erstelle die Liste „Wocheneinkauf" mit Milch, Brot und Eiern und teile sie mit Mama." Diese Zusammenfassung wird dem Nutzer zur Bestätigung gezeigt.\n' +
-      'TEILEN: Sagt der Nutzer, dass er die Notiz mit jemandem teilen will (z. B. "…und teile das mit Mama", "share this with Anna", "schick das an Papa"), ' +
-      'dann schreib NUR den genannten Namen in das Feld "shareWith" (z. B. "Mama", "Anna", "Papa") und lass diesen Teil-mit-Satz aus den Teilaufgaben WEG. ' +
-      'Sagt er nichts vom Teilen, lass "shareWith" weg.\n' +
+      'TEILEN (SEHR VORSICHTIG!): Setze "shareWith" NUR dann, wenn die Eingabe ein EINDEUTIGES Teilen-Kommando enthält – also ein Teilen-Verb ' +
+      '(teilen/teile, schicken/schick, senden, share, send, شارك, أرسل) ZUSAMMEN mit "mit/an/with/to/مع/إلى" und einem Namen, ' +
+      'z. B. "…und teile das mit Mama", "share this with Anna", "schick das an Papa". ' +
+      'Dann schreib NUR den genannten Namen in das Feld "shareWith" (z. B. "Mama", "Anna", "Papa") und lass diesen Teil-mit-Satz aus den Teilaufgaben WEG. ' +
+      'Ein bloßer Name – oder ein Wort, das nur zufällig wie ein Name KLINGT (z. B. eine Zutat oder ein Lebensmittel wie لحمة/„Fleisch") – ist KEIN Teilen-Befehl ' +
+      'und gehört normal in die Teilaufgaben. Sagt der Nutzer nichts vom Teilen, lass "shareWith" IMMER leer. Im Zweifel lieber gar nicht teilen als falsch teilen.\n' +
       'Erkenne dabei selbst, was gemeint ist:\n' +
       '• Nennt der Nutzer KONKRETE Dinge/Aufgaben (z. B. "Milch, Brot, Zahnarzt anrufen"), übernimm genau diese.\n' +
       '• Nennt der Nutzer ein VORHABEN oder ZIEL (z. B. "Tiramisu backen", "Geburtstagsparty planen", "für 3 Tage packen"), ' +
