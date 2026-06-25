@@ -56,23 +56,35 @@ async function transcribe(file: any): Promise<string> {
   throw new Error('Transkription fehlgeschlagen: ' + errs.join('  ||  '));
 }
 
-async function generate(client: any, prompt: string, isVoice = false) {
+async function generate(client: any, prompt: string, isVoice = false, context: any = null) {
   const schema = {
     type: 'object',
     additionalProperties: false,
     properties: {
       title: { type: 'string' },
       items: { type: 'array', items: { type: 'string' } },
-      shareWith: { type: 'string' }
+      shareWith: { type: 'string' },
+      summary: { type: 'string' }
     },
-    required: ['title', 'items']
+    required: ['title', 'items', 'summary']
   };
+  let userContent = (isVoice ? 'Gesprochene Notiz: ' : '') + prompt;
+  if (context && context.title) {
+    userContent =
+      'AKTUELLE LISTE (vom Nutzer noch NICHT bestätigt):\n' +
+      'Titel: ' + context.title + '\n' +
+      'Punkte: ' + ((context.items || []).join(', ') || '(keine)') + '\n' +
+      (context.shareWith ? 'Teilen mit: ' + context.shareWith + '\n' : '') +
+      '\nDer Nutzer möchte diese Liste ANPASSEN. Seine Korrektur (gesprochen): "' + prompt + '"\n' +
+      'Gib die VOLLSTÄNDIGE aktualisierte Liste zurück (nicht nur die Änderung) + eine kurze Zusammenfassung der Änderung.';
+  }
   const res = await client.messages.create({
     model: MODEL_GENERATE,
     max_tokens: 1024,
     system:
       'Du wandelst die Eingabe in eine übersichtliche Liste um: einen kurzen Titel und passende Teilaufgaben (3–25 knappe Punkte, ohne Nummerierung).\n' +
       'ANTWORTE IN DERSELBEN SPRACHE wie die Eingabe des Nutzers (z. B. Deutsch auf Deutsch, Englisch auf Englisch). Titel UND Teilaufgaben in dieser Sprache.\n' +
+      'ZUSAMMENFASSUNG ("summary"): Schreib in 1 kurzen, freundlichen Satz (in der Sprache des Nutzers), WAS du verstanden hast und gleich tust — z. B. "Ich erstelle die Liste „Wocheneinkauf" mit Milch, Brot und Eiern und teile sie mit Mama." Diese Zusammenfassung wird dem Nutzer zur Bestätigung gezeigt.\n' +
       'TEILEN: Sagt der Nutzer, dass er die Notiz mit jemandem teilen will (z. B. "…und teile das mit Mama", "share this with Anna", "schick das an Papa"), ' +
       'dann schreib NUR den genannten Namen in das Feld "shareWith" (z. B. "Mama", "Anna", "Papa") und lass diesen Teil-mit-Satz aus den Teilaufgaben WEG. ' +
       'Sagt er nichts vom Teilen, lass "shareWith" weg.\n' +
@@ -85,7 +97,7 @@ async function generate(client: any, prompt: string, isVoice = false) {
       'Berücksichtige genannte PORTIONEN / Personenzahl und SKALIERE die Mengen entsprechend (z. B. "für 8 Personen" → doppelte Mengen ggü. 4). ' +
       'Ohne Angabe nimm eine übliche Menge (etwa 4 Portionen) und schreib die Portionszahl in den Titel (z. B. "Tiramisu (4 Portionen)").',
     output_config: { format: { type: 'json_schema', schema } },
-    messages: [{ role: 'user', content: (isVoice ? 'Gesprochene Notiz: ' : '') + prompt }]
+    messages: [{ role: 'user', content: userContent }]
   });
   return JSON.parse(textFrom(res));
 }
@@ -139,7 +151,12 @@ Deno.serve(async (req) => {
       if (!file) return json({ error: 'Keine Audiodatei empfangen.' }, 400);
       const transcript = await transcribe(file);
       if (!transcript.trim()) return json({ error: 'Nichts verstanden – bitte nochmal aufnehmen.' }, 400);
-      const list = await generate(client, transcript, true);
+      let context: any = null;
+      try {
+        const ctxRaw = form.get('context');
+        if (ctxRaw) context = JSON.parse(String(ctxRaw));
+      } catch {}
+      const list = await generate(client, transcript, true, context);
       return json({ ...list, transcript });
     }
 

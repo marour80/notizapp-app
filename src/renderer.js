@@ -1449,6 +1449,7 @@ let audioChunks = [];
 let voiceTimer = null;
 let voiceSeconds = 0;
 let voiceTargetId = null; // null = neue Notiz; sonst füllt es diese offene Notiz
+let voiceDraft = null; // von der KI verstandene Liste, noch vom Nutzer zu bestätigen
 
 // Ergebnis in eine bestehende, offene Notiz einfüllen (Titel nur wenn leer; Punkte anhängen).
 function fillNoteFromVoice(noteId, title, items) {
@@ -1478,8 +1479,18 @@ function showVoiceError(msg) {
 async function startVoice(targetId) {
   if (!aiAvailable()) return;
   voiceTargetId = typeof targetId === 'string' ? targetId : null;
+  voiceDraft = null; // frischer Start
+  beginRecording();
+}
+function adjustVoice() {
+  // Nachbessern: erneut aufnehmen, aber den aktuellen Entwurf als Kontext behalten.
+  beginRecording();
+}
+
+async function beginRecording() {
   $('voiceError').classList.add('hidden');
   $('voiceProcessing').classList.add('hidden');
+  $('voiceConfirm').classList.add('hidden');
   $('voiceRecording').classList.remove('hidden');
   $('voiceTimer').textContent = '0:00';
   $('voiceModal').classList.remove('hidden');
@@ -1492,7 +1503,7 @@ async function startVoice(targetId) {
       if (e.data && e.data.size) audioChunks.push(e.data);
     };
     mediaRecorder.onstop = async () => {
-      stream.getTracks().forEach((t) => t.stop());
+      stream.getTracks().forEach((tr) => tr.stop());
       await processVoice(new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' }));
     };
     mediaRecorder.start();
@@ -1520,29 +1531,68 @@ function stopVoice() {
 
 function closeVoice() {
   stopVoice();
+  voiceDraft = null;
   $('voiceModal').classList.add('hidden');
 }
 
 async function processVoice(blob) {
   $('voiceRecording').classList.add('hidden');
+  $('voiceConfirm').classList.add('hidden');
   $('voiceProcessing').classList.remove('hidden');
   try {
-    const t = blob.type || '';
-    const ext = /mp4|mpeg|m4a/.test(t) ? 'mp4' : /ogg/.test(t) ? 'ogg' : /wav/.test(t) ? 'wav' : 'webm';
+    const tp = blob.type || '';
+    const ext = /mp4|mpeg|m4a|aac/.test(tp) ? 'mp4' : /ogg/.test(tp) ? 'ogg' : /wav/.test(tp) ? 'wav' : 'webm';
     const fd = new FormData();
     fd.append('file', blob, 'audio.' + ext);
-    const res = await NZAI.voice(fd);
-    $('voiceModal').classList.add('hidden');
-    if (voiceTargetId && data.notes.find((n) => n.id === voiceTargetId)) {
-      fillNoteFromVoice(voiceTargetId, res.title, res.items);
-    } else {
-      createNoteFromAI(res.title, res.items);
+    if (voiceDraft) {
+      fd.append(
+        'context',
+        JSON.stringify({ title: voiceDraft.title, items: voiceDraft.items, shareWith: voiceDraft.shareWith })
+      );
     }
-    if (res.shareWith && String(res.shareWith).trim()) promptVoiceShare(res.shareWith);
+    const res = await NZAI.voice(fd);
+    voiceDraft = {
+      title: res.title || '',
+      items: res.items || [],
+      shareWith: (res.shareWith || '').trim(),
+      summary: res.summary || ''
+    };
+    showVoiceConfirm(voiceDraft);
   } catch (e) {
     $('voiceProcessing').classList.add('hidden');
     showVoiceError(t('errGeneric') + (e.message || e));
   }
+}
+
+// Zeigt, was die KI verstanden hat → der Nutzer bestätigt oder bessert nach.
+function showVoiceConfirm(draft) {
+  $('voiceProcessing').classList.add('hidden');
+  $('voiceRecording').classList.add('hidden');
+  $('voiceSummary').textContent = draft.summary || '';
+  $('voicePreviewTitle').textContent = draft.title || t('newList');
+  $('voicePreviewItems').innerHTML = (draft.items || []).map((it) => `<li>${escapeHtml(it)}</li>`).join('');
+  const shareEl = $('voicePreviewShare');
+  if (draft.shareWith) {
+    shareEl.textContent = '🔗 ' + t('voiceShareLine', { who: draft.shareWith });
+    shareEl.classList.remove('hidden');
+  } else {
+    shareEl.classList.add('hidden');
+  }
+  $('voiceConfirm').classList.remove('hidden');
+}
+
+function confirmVoice() {
+  const draft = voiceDraft;
+  if (!draft) return;
+  $('voiceModal').classList.add('hidden');
+  if (voiceTargetId && data.notes.find((n) => n.id === voiceTargetId)) {
+    fillNoteFromVoice(voiceTargetId, draft.title, draft.items);
+  } else {
+    createNoteFromAI(draft.title, draft.items);
+  }
+  const shareWith = draft.shareWith;
+  voiceDraft = null;
+  if (shareWith) promptVoiceShare(shareWith);
 }
 
 // ---- Events ----
@@ -1552,6 +1602,8 @@ $('voiceBtn').onclick = () => startVoice(null);
 $('fabVoice').onclick = () => startVoice(null);
 $('editVoiceBtn').onclick = () => startVoice(activeNoteId);
 $('voiceStop').onclick = stopVoice;
+$('voiceConfirmBtn').onclick = confirmVoice;
+$('voiceAdjustBtn').onclick = adjustVoice;
 $('voiceClose').onclick = closeVoice;
 $('sortBtn').onclick = aiSort;
 $('newFolderBtn').onclick = newFolder;

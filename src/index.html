@@ -295,11 +295,21 @@
         <div class="voice-pulse">🎙️</div>
         <p class="modal-hint" data-i18n="voiceRecHint">Sprich deine Liste ein – z. B. „Ich muss Milch, Brot und Eier kaufen und den Müll rausbringen."</p>
         <p class="voice-timer" id="voiceTimer">0:00</p>
-        <button id="voiceStop" class="primary-btn" data-i18n="voiceDone">⏹ Fertig &amp; Liste erstellen</button>
+        <button id="voiceStop" class="primary-btn" data-i18n="voiceDone">⏹ Fertig</button>
       </div>
       <div id="voiceProcessing" class="hidden">
-        <div class="voice-pulse">✨</div>
-        <p class="modal-hint" data-i18n="voiceProcessing">Transkribiere &amp; erstelle Liste…</p>
+        <div class="thinking"><span></span><span></span><span></span></div>
+        <p class="modal-hint" data-i18n="voiceThinking">Ich höre zu und denke nach…</p>
+      </div>
+      <div id="voiceConfirm" class="hidden">
+        <p class="voice-summary" id="voiceSummary"></p>
+        <div class="voice-preview">
+          <h3 id="voicePreviewTitle"></h3>
+          <ul id="voicePreviewItems"></ul>
+          <div id="voicePreviewShare" class="voice-share-line hidden"></div>
+        </div>
+        <button id="voiceConfirmBtn" class="primary-btn voice-confirm-btn" data-i18n="voiceConfirm">✓ Passt – erstellen</button>
+        <button id="voiceAdjustBtn" class="voice-adjust-btn" data-i18n="voiceAdjust">🎤 Anpassen</button>
       </div>
       <div id="voiceError" class="join-error hidden"></div>
     </div>
