@@ -1,6 +1,6 @@
 {
   "name": "smartnote",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "Eine coole, einfache Notiz-App für Windows",
   "main": "main.js",
   "scripts": {
@@ -41,6 +41,7 @@
     "@capacitor/core": "^8.4.0",
     "@capacitor/ios": "^8.4.1",
     "@capacitor/push-notifications": "^8.1.1",
-    "@supabase/supabase-js": "^2.107.0"
+    "@supabase/supabase-js": "^2.107.0",
+    "capacitor-voice-recorder": "^7.0.6"
   }
 }

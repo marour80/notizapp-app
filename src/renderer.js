@@ -1375,6 +1375,7 @@ let voiceTimer = null;
 let voiceSeconds = 0;
 let voiceTargetId = null; // null = neue Notiz; sonst füllt es diese offene Notiz
 let voiceDraft = null; // von der KI verstandene Liste, noch vom Nutzer zu bestätigen
+let nativeRecording = false; // läuft gerade eine native iOS-Aufnahme?
 
 // Ergebnis in eine bestehende, offene Notiz einfüllen (Titel nur wenn leer; Punkte anhängen).
 function fillNoteFromVoice(noteId, title, items) {
@@ -1419,6 +1420,21 @@ async function beginRecording() {
   $('voiceRecording').classList.remove('hidden');
   $('voiceTimer').textContent = '0:00';
   $('voiceModal').classList.remove('hidden');
+
+  // iOS: nativer Recorder (Web-Aufnahme liefert dort stilles Audio → "You"-Halluzination).
+  if (window.NZNative && NZNative.nativeRecordAvailable && NZNative.nativeRecordAvailable()) {
+    const ok = await NZNative.startNativeRecording();
+    if (!ok) {
+      $('voiceRecording').classList.add('hidden');
+      showVoiceError(t('micDenied'));
+      return;
+    }
+    nativeRecording = true;
+    startVoiceTimer();
+    return;
+  }
+
+  // Web/Android: MediaRecorder
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioChunks = [];
@@ -1432,18 +1448,29 @@ async function beginRecording() {
       await processVoice(new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' }));
     };
     mediaRecorder.start();
-    voiceSeconds = 0;
-    voiceTimer = setInterval(() => {
-      voiceSeconds++;
-      const m = Math.floor(voiceSeconds / 60);
-      const s = voiceSeconds % 60;
-      $('voiceTimer').textContent = m + ':' + String(s).padStart(2, '0');
-      if (voiceSeconds >= 120) stopVoice(); // Sicherheitslimit 2 Min
-    }, 1000);
+    startVoiceTimer();
   } catch (e) {
     $('voiceRecording').classList.add('hidden');
     showVoiceError(t('micDenied'));
   }
+}
+
+function startVoiceTimer() {
+  voiceSeconds = 0;
+  voiceTimer = setInterval(() => {
+    voiceSeconds++;
+    const m = Math.floor(voiceSeconds / 60);
+    const s = voiceSeconds % 60;
+    $('voiceTimer').textContent = m + ':' + String(s).padStart(2, '0');
+    if (voiceSeconds >= 120) stopVoice(); // Sicherheitslimit 2 Min
+  }, 1000);
+}
+
+function base64ToBlob(b64, mime) {
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime || 'audio/aac' });
 }
 
 function stopVoice() {
@@ -1451,11 +1478,36 @@ function stopVoice() {
     clearInterval(voiceTimer);
     voiceTimer = null;
   }
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  if (nativeRecording) {
+    nativeRecording = false;
+    NZNative.stopNativeRecording().then((d) => {
+      if (d && d.base64) processVoice(base64ToBlob(d.base64, d.mimeType));
+      else {
+        $('voiceRecording').classList.add('hidden');
+        showVoiceError(t('micDenied'));
+      }
+    });
+  } else if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
 }
 
 function closeVoice() {
-  stopVoice();
+  if (voiceTimer) {
+    clearInterval(voiceTimer);
+    voiceTimer = null;
+  }
+  if (nativeRecording) {
+    nativeRecording = false;
+    try {
+      NZNative.stopNativeRecording();
+    } catch {}
+  } else if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.onstop = null; // verwerfen, nicht verarbeiten
+    try {
+      mediaRecorder.stop();
+    } catch {}
+  }
   voiceDraft = null;
   $('voiceModal').classList.add('hidden');
 }
@@ -1466,7 +1518,7 @@ async function processVoice(blob) {
   $('voiceProcessing').classList.remove('hidden');
   try {
     const tp = blob.type || '';
-    const ext = /mp4|mpeg|m4a|aac/.test(tp) ? 'mp4' : /ogg/.test(tp) ? 'ogg' : /wav/.test(tp) ? 'wav' : 'webm';
+    const ext = /m4a|aac/.test(tp) ? 'm4a' : /mp4|mpeg/.test(tp) ? 'mp4' : /ogg/.test(tp) ? 'ogg' : /wav/.test(tp) ? 'wav' : 'webm';
     const fd = new FormData();
     fd.append('file', blob, 'audio.' + ext);
     if (voiceDraft) {

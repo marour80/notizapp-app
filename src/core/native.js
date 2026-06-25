@@ -82,6 +82,41 @@
     return list.length ? list[0].rawValue || list[0].displayValue || '' : '';
   }
 
+  // ---- Nativer Audio-Recorder (für iOS – Web-Aufnahme liefert dort stilles Audio) ----
+  function isIOS() {
+    return !!(cap() && cap().getPlatform && cap().getPlatform() === 'ios');
+  }
+  function voiceRec() {
+    return plugin('VoiceRecorder');
+  }
+  function nativeRecordAvailable() {
+    return isIOS() && !!voiceRec();
+  }
+  async function startNativeRecording() {
+    const VR = voiceRec();
+    if (!VR) return false;
+    try {
+      const perm = await VR.requestAudioRecordingPermission();
+      if (perm && perm.value === false) return false;
+    } catch {}
+    try {
+      await VR.startRecording();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  async function stopNativeRecording() {
+    const VR = voiceRec();
+    if (!VR) return null;
+    try {
+      const res = await VR.stopRecording();
+      const v = res && res.value;
+      if (v && v.recordDataBase64) return { base64: v.recordDataBase64, mimeType: v.mimeType || 'audio/aac' };
+    } catch {}
+    return null;
+  }
+
   // ---- Externen Browser öffnen (für OAuth-Login) ----
   // iOS: window.open('_system') öffnet nichts → Capacitor-Browser-Plugin nutzen.
   async function openUrl(url) {
@@ -145,5 +180,5 @@
     return true;
   }
 
-  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, registerPush, parseCode, plugin };
+  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, registerPush, parseCode, plugin };
 })(typeof window !== 'undefined' ? window : globalThis);
