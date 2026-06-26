@@ -5,5 +5,14 @@
   "backgroundColor": "#16161e",
   "android": {
     "backgroundColor": "#16161e"
+  },
+  "ios": {
+    "backgroundColor": "#16161e",
+    "scrollEnabled": false
+  },
+  "plugins": {
+    "Keyboard": {
+      "resize": "none"
+    }
   }
 }

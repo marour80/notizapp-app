@@ -180,5 +180,25 @@
     return true;
   }
 
-  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, registerPush, parseCode, plugin };
+  // ---- Tastatur (iOS): Editor-Bereich über die Tastatur schrumpfen, statt den ganzen Screen zu schieben ----
+  // Setzt --kb-height (Tastaturhöhe) und body.kb-open; das CSS verkleinert dann nur den Editor.
+  function initKeyboard() {
+    const KB = plugin('Keyboard');
+    if (!KB || !KB.addListener) return;
+    const doc = global.document;
+    if (!doc) return;
+    const setKb = (h) => doc.documentElement.style.setProperty('--kb-height', (h || 0) + 'px');
+    // iOS soll den WebView NICHT selbst hochscrollen – wir regeln die Höhe per CSS.
+    try { KB.setScroll && KB.setScroll({ isDisabled: true }); } catch {}
+    KB.addListener('keyboardWillShow', (info) => {
+      setKb(info && info.keyboardHeight);
+      doc.body.classList.add('kb-open');
+    });
+    KB.addListener('keyboardWillHide', () => {
+      setKb(0);
+      doc.body.classList.remove('kb-open');
+    });
+  }
+
+  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, registerPush, parseCode, plugin, initKeyboard };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1725,7 +1725,9 @@ function submitSubtask() {
   const inp = $('subAddInput');
   addSubtask(inp.value);
   inp.value = '';
-  inp.focus(); // gleich die nächste eingeben können
+  focusSubAdd(); // gleich die naechste eingeben koennen – ohne iOS-Hochscrollen (preventScroll)
+  const l = $('subList'); // neueste Teilaufgabe sichtbar halten (oberhalb der Tastatur)
+  if (l) l.scrollTop = l.scrollHeight;
 }
 $('subAddInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') submitSubtask();
@@ -1786,6 +1788,8 @@ if (window.NZNative && NZNative.scanAvailable()) {
 
 // Tiefen-Link notizapp://join?code=… → Dialog öffnen + automatisch beitreten
 if (window.NZNative && NZNative.isNative()) {
+  if (NZNative.initKeyboard) NZNative.initKeyboard(); // Tastatur schiebt nicht mehr den ganzen Screen
+
   NZNative.onDeepLink((code) => {
     showJoinModal(true);
     $('joinInput').value = code;
