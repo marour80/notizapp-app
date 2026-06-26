@@ -51,6 +51,7 @@
         tags: [],
         status: 'todo',
         subtasks: [],
+        pinned: false, // angeheftet → bleibt oben in der Liste
         share: null, // { code, createdBy, members: [] } – wird in Phase 3 genutzt
         createdAt: now,
         updatedAt: now

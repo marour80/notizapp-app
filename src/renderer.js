@@ -172,7 +172,9 @@ function filteredNotes() {
         (n.body || '').toLowerCase().includes(q)
     );
   }
-  return list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return list.sort(
+    (a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0)
+  );
 }
 
 // ---- Rendering ----
@@ -238,10 +240,12 @@ function renderNoteList() {
     const shareHtml = n.share && n.share.code ? '<span class="card-share">🔗</span>' : '';
     const snippet = escapeHtml(stripMd(n.body || ''));
     li.innerHTML = `
+      <button class="card-pin" aria-label="${t(n.pinned ? 'unpin' : 'pin')}" title="${t(n.pinned ? 'unpin' : 'pin')}">📌</button>
       <button class="card-delete" aria-label="${t('delete')}" title="${t('delete')}">🗑</button>
       <div class="card-inner">
         <div class="card-title-row">
           <span class="dot dot-${status}" title="${statusLabel(status)}${hasSubs ? ' ' + t('fromSubtasks') : ' ' + t('clickToCycle')}"></span>
+          ${n.pinned ? '<span class="card-pinned" title="' + t('pinned') + '">📌</span>' : ''}
           <h3>${escapeHtml(n.title) || t('untitled')}</h3>
         </div>
         <div class="snippet">${snippet || (subs.length ? subs.map((s) => '• ' + escapeHtml(s.text)).join('  ') : t('noContent'))}</div>
@@ -260,6 +264,10 @@ function renderNoteList() {
     li.querySelector('.card-delete').onclick = (e) => {
       e.stopPropagation();
       deleteNoteById(n.id);
+    };
+    li.querySelector('.card-pin').onclick = (e) => {
+      e.stopPropagation();
+      togglePin(n.id);
     };
     attachSwipe(li, inner, n.id);
     noteListEl.appendChild(li);
@@ -309,8 +317,8 @@ function attachSwipe(li, inner, noteId) {
     }
     if (decided !== 'h') return;
     suppressClick = true;
-    const base = li.classList.contains('swiped') ? -86 : 0;
-    dx = Math.max(-100, Math.min(0, base + mx));
+    const base = li.classList.contains('swiped') ? -144 : 0;
+    dx = Math.max(-158, Math.min(0, base + mx));
     inner.style.transform = 'translateX(' + dx + 'px)';
     e.preventDefault();
   });
@@ -321,7 +329,7 @@ function attachSwipe(li, inner, noteId) {
     li.classList.remove('dragging');
     inner.style.transform = '';
     if (decided === 'h') {
-      if (dx < -43) {
+      if (dx < -60) {
         li.classList.add('swiped');
         openSwipedCard = li;
       } else {
@@ -353,6 +361,8 @@ function newNote() {
     folder: currentFolder === '__all__' ? '' : currentFolder,
     tags: [],
     status: currentStatus !== 'all' ? currentStatus : 'todo',
+    subtasks: [],
+    pinned: false,
     createdAt: Date.now(),
     updatedAt: Date.now()
   };
@@ -363,11 +373,59 @@ function newNote() {
   titleInput.focus();
 }
 
+// Schnellstart-Vorlage vom leeren Startbildschirm: legt eine passende Notiz an
+// (Einkauf wird angeheftet) und fragt dann, ob per Sprache oder Tippen gefüllt wird.
+function startTemplate(kind) {
+  const isShop = kind === 'shop';
+  const note = {
+    id: uid(),
+    title: isShop ? t('tplShopTitle') : t('tplTodoTitle'),
+    body: '',
+    folder: currentFolder === '__all__' ? '' : currentFolder,
+    tags: [],
+    status: 'todo',
+    subtasks: [],
+    pinned: isShop,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  data.notes.unshift(note);
+  persist();
+  openNote(note.id);
+  renderAll();
+  showFillChoice(note.id);
+}
+
+// Auswahl-Blatt: Liste per Sprache oder selbst tippen füllen.
+let fillChoiceNoteId = null;
+function showFillChoice(noteId) {
+  fillChoiceNoteId = noteId;
+  const note = data.notes.find((n) => n.id === noteId);
+  $('fillChoiceTitle').textContent = (note && note.title) || t('newList');
+  $('fillChoiceVoice').classList.toggle('hidden', !aiAvailable()); // ohne KI keine Sprachfüllung
+  $('fillChoiceModal').classList.remove('hidden');
+}
+function closeFillChoice() {
+  $('fillChoiceModal').classList.add('hidden');
+  fillChoiceNoteId = null;
+}
+function fillChoiceVoice() {
+  const id = fillChoiceNoteId;
+  closeFillChoice();
+  if (id) startVoice(id);
+}
+function fillChoiceType() {
+  closeFillChoice();
+  const inp = $('subAddInput');
+  if (inp) inp.focus();
+}
+
 function openNote(id) {
   const note = data.notes.find((n) => n.id === id);
   if (!note) return;
   closeAllSwipes();
   activeNoteId = id;
+  doneGroupOpen = false; // erledigte Teilaufgaben starten zugeklappt
   document.body.classList.add('editor-open'); // Handy: Editor-Ebene einblenden
   setNav(false);
   editorEmptyEl.classList.add('hidden');
@@ -378,6 +436,7 @@ function openNote(id) {
   renderSubtasks();
   updateSharedBadge(note);
   updatePresence(note);
+  updatePinBtn(note);
   renderNoteList();
 }
 
@@ -429,6 +488,27 @@ function deleteNoteById(id) {
   renderAll();
 }
 
+// Notiz anheften / lösen – angeheftete Notizen bleiben oben in der Liste.
+function togglePin(id) {
+  const note = data.notes.find((n) => n.id === id);
+  if (!note) return;
+  note.pinned = !note.pinned;
+  closeAllSwipes();
+  persist();
+  renderNoteList();
+  if (activeNoteId === id) updatePinBtn(note);
+}
+
+// Zustand des Anheft-Knopfes in der offenen Notiz aktualisieren.
+function updatePinBtn(note) {
+  const btn = $('pinBtn');
+  if (!btn) return;
+  const on = !!(note && note.pinned);
+  btn.classList.toggle('active', on);
+  btn.title = t(on ? 'unpin' : 'pin');
+  btn.setAttribute('aria-label', t(on ? 'unpin' : 'pin'));
+}
+
 // ---- Status (Logik liegt im Kern: NZ.deriveStatus / NZ.applyAutoStatus) ----
 function renderStatusRow(status) {
   const note = currentNote();
@@ -459,6 +539,41 @@ function cycleStatus(id) {
 }
 
 // ---- Subtasks ----
+let doneGroupOpen = false; // erledigte Teilaufgaben: Gruppe auf/zu
+
+// Baut eine einzelne Teilaufgaben-Zeile (li) – für offene UND erledigte verwendet.
+function buildSubItem(st, note, noteShared) {
+  const status = st.status || 'todo';
+  const li = document.createElement('li');
+  li.className = 'sub-item' + (status === 'done' ? ' done' : '');
+  li.innerHTML = `
+      <span class="dot dot-${status}" title="${statusLabel(status)} ${t('clickToCycle')}"></span>
+      <input class="sub-text" type="text" value="" />
+      ${st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : ''}
+      ${noteShared ? whoBadge(note, st) : ''}
+      <button class="sub-photo" title="${t(st.photo ? 'photo' : 'addPhoto')}">📷</button>
+      <button class="sub-del" title="${t('deleteSubtask')}">✕</button>`;
+  const input = li.querySelector('.sub-text');
+  input.value = st.text || '';
+  li.querySelector('.dot').onclick = () => cycleSubtask(st.id);
+  input.oninput = () => {
+    st.text = input.value;
+    note.updatedAt = Date.now();
+    scheduleSubSave();
+  };
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      $('subAddInput').focus();
+    }
+  };
+  li.querySelector('.sub-photo').onclick = () => pickSubtaskPhoto(st.id);
+  const thumb = li.querySelector('.sub-thumb');
+  if (thumb) thumb.onclick = () => openPhoto(st.id);
+  li.querySelector('.sub-del').onclick = () => deleteSubtask(st.id);
+  return li;
+}
+
 function renderSubtasks() {
   const note = currentNote();
   const listEl = $('subList');
@@ -467,37 +582,26 @@ function renderSubtasks() {
   if (!note.subtasks) note.subtasks = [];
 
   const noteShared = !!(note.share && note.share.code);
-  note.subtasks.forEach((st) => {
-    const status = st.status || 'todo';
-    const li = document.createElement('li');
-    li.className = 'sub-item' + (status === 'done' ? ' done' : '');
-    li.innerHTML = `
-      <span class="dot dot-${status}" title="${statusLabel(status)} ${t('clickToCycle')}"></span>
-      <input class="sub-text" type="text" value="" />
-      ${st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : ''}
-      ${noteShared ? whoBadge(note, st) : ''}
-      <button class="sub-photo" title="${t(st.photo ? 'photo' : 'addPhoto')}">📷</button>
-      <button class="sub-del" title="${t('deleteSubtask')}">✕</button>`;
-    const input = li.querySelector('.sub-text');
-    input.value = st.text || '';
-    li.querySelector('.dot').onclick = () => cycleSubtask(st.id);
-    input.oninput = () => {
-      st.text = input.value;
-      note.updatedAt = Date.now();
-      scheduleSubSave();
+  const active = note.subtasks.filter((s) => (s.status || 'todo') !== 'done');
+  const done = note.subtasks.filter((s) => (s.status || 'todo') === 'done');
+
+  // Offene zuerst, in ihrer normalen Reihenfolge.
+  active.forEach((st) => listEl.appendChild(buildSubItem(st, note, noteShared)));
+
+  // Erledigte gebündelt in eine zusammenklappbare Gruppe ganz unten.
+  if (done.length) {
+    const header = document.createElement('li');
+    header.className = 'done-group' + (doneGroupOpen ? ' open' : '');
+    header.innerHTML = `<span class="done-caret">▸</span><span class="done-label">${t('doneGroup', { n: done.length })}</span>`;
+    header.onclick = () => {
+      doneGroupOpen = !doneGroupOpen;
+      renderSubtasks();
     };
-    input.onkeydown = (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        $('subAddInput').focus();
-      }
-    };
-    li.querySelector('.sub-photo').onclick = () => pickSubtaskPhoto(st.id);
-    const thumb = li.querySelector('.sub-thumb');
-    if (thumb) thumb.onclick = () => openPhoto(st.id);
-    li.querySelector('.sub-del').onclick = () => deleteSubtask(st.id);
-    listEl.appendChild(li);
-  });
+    listEl.appendChild(header);
+    if (doneGroupOpen) {
+      done.forEach((st) => listEl.appendChild(buildSubItem(st, note, noteShared)));
+    }
+  }
 
   applyAutoStatus(note);
   updateSubProgress(note);
@@ -1585,6 +1689,16 @@ $('voiceClose').onclick = closeVoice;
 $('sortBtn').onclick = aiSort;
 $('newFolderBtn').onclick = newFolder;
 $('deleteBtn').onclick = deleteNote;
+$('pinBtn').onclick = () => togglePin(activeNoteId);
+document.querySelectorAll('#emptyList .tpl-tile').forEach((b) => {
+  b.onclick = () => startTemplate(b.dataset.tpl);
+});
+$('fillChoiceVoice').onclick = fillChoiceVoice;
+$('fillChoiceType').onclick = fillChoiceType;
+$('fillChoiceClose').onclick = closeFillChoice;
+$('fillChoiceModal').addEventListener('click', (e) => {
+  if (e.target === $('fillChoiceModal')) closeFillChoice();
+});
 $('themeToggle').onclick = () =>
   applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
 if ($('langToggle')) $('langToggle').onclick = toggleLanguage;

@@ -75,7 +75,22 @@
         <button data-filter="done"><span class="dot dot-done"></span></button>
       </div>
       <ul id="noteList" class="note-list"></ul>
-      <div id="emptyList" class="empty-list hidden" data-i18n="emptyList">Keine Notizen hier.<br/>Tippe auf <b>+</b> für deine erste Notiz!</div>
+      <div id="emptyList" class="empty-list hidden">
+        <p class="empty-title" data-i18n="emptyTitle">Bereit für deine erste Liste?</p>
+        <p class="empty-sub" data-i18n="emptySub">Wähle eine Vorlage zum Loslegen.</p>
+        <div class="tpl-grid">
+          <button class="tpl-tile tpl-shop" data-tpl="shop">
+            <span class="tpl-ic">🛒</span>
+            <span class="tpl-name" data-i18n="tplShop">Einkaufsliste</span>
+            <span class="tpl-hint"><span class="tpl-pin">📌</span><span data-i18n="tplShopHint">Bleibt oben</span></span>
+          </button>
+          <button class="tpl-tile tpl-todo" data-tpl="todo">
+            <span class="tpl-ic">✅</span>
+            <span class="tpl-name" data-i18n="tplTodo">To-do-Liste</span>
+            <span class="tpl-hint" data-i18n="tplTodoHint">Zum Abhaken</span>
+          </button>
+        </div>
+      </div>
     </section>
 
     <button id="fabVoice" class="fab fab-voice hidden" data-i18n-title="voiceNoteTitle" data-i18n-aria="voiceNoteTitle" title="Sprachnotiz aufnehmen" aria-label="Sprachnotiz aufnehmen">🎤</button>
@@ -95,6 +110,7 @@
           </div>
           <div class="toolbar-right">
             <button id="editVoiceBtn" class="hidden" data-i18n-title="voiceNoteTitle" title="Sprachnotiz aufnehmen">🎤</button>
+            <button id="pinBtn" data-i18n-title="pin" title="Anheften">📌</button>
             <button id="shareBtn" data-i18n-title="share" title="Teilen">🔗</button>
             <button id="deleteBtn" class="danger" data-i18n-title="delete" title="Löschen">🗑</button>
           </div>
@@ -199,6 +215,23 @@
       <div id="joinError" class="join-error hidden" data-i18n="codeNotFound">Code nicht gefunden – bitte prüfen.</div>
       <button id="scanBtn" class="primary-btn hidden" data-i18n="scanQr">📷 QR-Code scannen</button>
       <button id="doJoinBtn" class="primary-btn" data-i18n="join">Beitreten</button>
+    </div>
+  </div>
+
+  <!-- Füllen-Auswahl: Sprechen oder selbst tippen -->
+  <div id="fillChoiceModal" class="modal-overlay hidden">
+    <div class="modal fill-choice">
+      <button class="modal-close" id="fillChoiceClose">✕</button>
+      <h2 id="fillChoiceTitle">Einkaufsliste</h2>
+      <p class="modal-hint" data-i18n="fillChoiceQuestion">Wie möchtest du sie füllen?</p>
+      <button id="fillChoiceVoice" class="fill-opt fill-opt-primary">
+        <span class="fill-ic">🎤</span>
+        <span class="fill-txt"><span class="fill-name" data-i18n="fillVoice">Sprechen</span><span class="fill-sub" data-i18n="fillVoiceHint">Sag einfach, was du brauchst</span></span>
+      </button>
+      <button id="fillChoiceType" class="fill-opt">
+        <span class="fill-ic">⌨️</span>
+        <span class="fill-txt"><span class="fill-name" data-i18n="fillType">Selbst tippen</span><span class="fill-sub" data-i18n="fillTypeHint">Punkt für Punkt eingeben</span></span>
+      </button>
     </div>
   </div>
 
