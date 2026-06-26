@@ -10,7 +10,8 @@
     "deploy": "node tools/deploy-web.js",
     "sync": "cap sync",
     "android": "cap open android",
-    "icons": "@capacitor/assets generate --android"
+    "icons": "@capacitor/assets generate --android",
+    "postinstall": "patch-package"
   },
   "author": "",
   "license": "MIT",
@@ -18,6 +19,7 @@
     "@capacitor/cli": "^8.4.0",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0",
+    "patch-package": "^8.0.1",
     "sharp": "^0.34.5"
   },
   "build": {

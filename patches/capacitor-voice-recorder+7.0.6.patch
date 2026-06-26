@@ -1,0 +1,13 @@
+diff --git a/node_modules/capacitor-voice-recorder/ios/Plugin/CustomMediaRecorder.swift b/node_modules/capacitor-voice-recorder/ios/Plugin/CustomMediaRecorder.swift
+index 79d79a4..82a1979 100644
+--- a/node_modules/capacitor-voice-recorder/ios/Plugin/CustomMediaRecorder.swift
++++ b/node_modules/capacitor-voice-recorder/ios/Plugin/CustomMediaRecorder.swift
+@@ -46,7 +46,7 @@ class CustomMediaRecorder {
+             originalRecordingSessionCategory = recordingSession.category
+             try recordingSession.setCategory(AVAudioSession.Category.playAndRecord)
+             try recordingSession.setActive(true)
+-            audioFilePath = getDirectoryToSaveAudioFile().appendingPathComponent("recording-\(Int(Date().timeIntervalSince1970 * 1000)).aac")
++            audioFilePath = getDirectoryToSaveAudioFile().appendingPathComponent("recording-\(Int(Date().timeIntervalSince1970 * 1000)).m4a")
+             audioRecorder = try AVAudioRecorder(url: audioFilePath, settings: settings)
+             audioRecorder.record()
+             status = CurrentRecordingStatus.RECORDING
