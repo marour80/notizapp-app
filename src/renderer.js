@@ -416,8 +416,18 @@ function fillChoiceVoice() {
 }
 function fillChoiceType() {
   closeFillChoice();
+  focusSubAdd();
+}
+
+// Eingabefeld fokussieren, OHNE dass iOS den Bildschirm hochscrollt (Leiste unter die Statusleiste).
+function focusSubAdd() {
   const inp = $('subAddInput');
-  if (inp) inp.focus();
+  if (!inp) return;
+  try {
+    inp.focus({ preventScroll: true });
+  } catch {
+    inp.focus();
+  }
 }
 
 function openNote(id) {
@@ -564,7 +574,7 @@ function buildSubItem(st, note, noteShared) {
   input.onkeydown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      $('subAddInput').focus();
+      focusSubAdd();
     }
   };
   li.querySelector('.sub-photo').onclick = () => pickSubtaskPhoto(st.id);

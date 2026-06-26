@@ -1249,7 +1249,8 @@ input, textarea, [contenteditable], .body-input, .preview {
 
   /* iPhone/Android: sichere Bereiche (Notch, Statusleiste, Home-Indikator) beachten */
   .note-list-panel { padding-top: env(safe-area-inset-top, 0px); }
-  .editor-panel { padding-top: env(safe-area-inset-top, 0px); }
+  /* Editor-Leiste hält selbst Abstand zur Statusleiste – auch wenn die Tastatur den Inhalt schiebt */
+  .editor-toolbar { padding-top: calc(12px + env(safe-area-inset-top, 0px)); }
   .sidebar {
     padding-top: calc(14px + env(safe-area-inset-top, 0px));
     padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
