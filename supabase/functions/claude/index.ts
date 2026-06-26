@@ -156,7 +156,9 @@ Deno.serve(async (req) => {
       const form = await req.formData();
       const file = form.get('file');
       if (!file) return json({ error: 'Keine Audiodatei empfangen.' }, 400);
+      console.log('[Claude] Audio empfangen:', (file as any).name, '|', (file as any).type, '|', ((file as any).size ?? '?') + ' bytes');
       const transcript = await transcribe(file);
+      console.log('[Claude] Transkript (' + transcript.length + ' Zeichen):', transcript.slice(0, 160));
       if (!transcript.trim()) return json({ error: 'Nichts verstanden – bitte nochmal aufnehmen.' }, 400);
       let context: any = null;
       try {
@@ -172,6 +174,8 @@ Deno.serve(async (req) => {
     if (mode === 'sort') return json(await sortItems(client, (input && input.items) || []));
     return json({ error: 'Unbekannter Modus' }, 400);
   } catch (e) {
-    return json({ error: String((e && (e as any).message) || e) }, 500);
+    const msg = String((e && (e as any).message) || e);
+    console.error('[Claude] Fehler:', msg);
+    return json({ error: msg }, 500);
   }
 });
