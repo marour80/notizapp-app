@@ -626,7 +626,8 @@ input, textarea, [contenteditable], .body-input, .preview {
 .subtasks {
   border-top: 1px solid var(--border);
   padding: 12px 24px 4px;
-  max-height: 42%;
+  flex: 1; /* füllt den restlichen Editor-Platz (Tablet quer / Desktop), Liste scrollt darin */
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
