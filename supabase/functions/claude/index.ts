@@ -34,18 +34,34 @@ function textFrom(res: any): string {
   return (block && block.text) || '{}';
 }
 
-// Sprachnachricht -> Text via OpenAI (probiert mehrere Modelle, je nach Projekt-Zugriff)
+// Leitet aus dem Audio-MIME-Typ einen Dateinamen mit einer von OpenAI AKZEPTIERTEN Endung ab.
+// Wichtig für iOS: der Recorder liefert "audio/aac" → OpenAI kennt ".aac" NICHT, aber ".m4a" (gleicher Container).
+// So ist die Erkennung unabhängig davon, welchen (oder gar keinen) Namen der Client mitschickt.
+function audioFilename(file: any): string {
+  const t = ((file && file.type) || '').toLowerCase();
+  if (t.includes('webm')) return 'audio.webm';
+  if (t.includes('ogg')) return 'audio.ogg';
+  if (t.includes('wav')) return 'audio.wav';
+  if (t.includes('mpeg') || t.includes('mp3') || t.includes('mpga')) return 'audio.mp3';
+  if (t.includes('mp4')) return 'audio.mp4';
+  if (t.includes('aac') || t.includes('m4a')) return 'audio.m4a';
+  const n = (file && file.name) || '';
+  if (/\.(flac|m4a|mp3|mp4|mpeg|mpga|oga|ogg|wav|webm)$/i.test(n)) return n;
+  return 'audio.m4a';
+}
+
+// Sprachnachricht -> Text via OpenAI Whisper.
 async function transcribe(file: any): Promise<string> {
   const key = Deno.env.get('OPENAI_API_KEY');
   if (!key) throw new Error('OPENAI_API_KEY fehlt (Secret in Supabase setzen).');
-  // gpt-4o-mini-transcribe ZUERST: genauer + robuster bei mehrsprachigem/undeutlichem Audio
-  // (whisper-1 halluziniert am Audio-Anfang gern ein fremdsprachiges Bruchstück) – und ist sogar günstiger.
-  // whisper-1 bleibt als Fallback, falls das neue Modell mal einen Fehler liefert.
-  const models = ['gpt-4o-mini-transcribe', 'whisper-1'];
+  // whisper-1: in diesem OpenAI-Projekt freigeschaltet und akzeptiert die gängigen Audioformate.
+  // (gpt-4o-mini-transcribe wäre genauer, ist hier aber nicht freigegeben → "does not have access".)
+  const models = ['whisper-1'];
+  const name = audioFilename(file);
   const errs: string[] = [];
   for (const model of models) {
     const fd = new FormData();
-    fd.append('file', file, file.name || 'audio.webm');
+    fd.append('file', file, name);
     fd.append('model', model);
     const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
