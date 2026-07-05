@@ -1538,3 +1538,8 @@ input, textarea, [contenteditable], .body-input, .preview {
   text-overflow: ellipsis;
 }
 .setting-acc .acc-sub:empty { display: none; }
+
+/* Editor = Vollbild: Bottom-Nav ausblenden (zurueck ueber "‹ Liste") */
+@media (max-width: 760px) {
+  body.editor-open .bottom-nav { display: none; }
+}

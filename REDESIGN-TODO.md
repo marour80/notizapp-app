@@ -1,4 +1,4 @@
-# Redesign (Glass/Teal) — offene Punkte
+# Redesign (Glass/Teal) — Stand
 
 Branch: `redesign-glass-ui`. `main`/TestFlight bleibt unberührt, bis alles abgesegnet ist.
 
@@ -7,19 +7,19 @@ Branch: `redesign-glass-ui`. `main`/TestFlight bleibt unberührt, bis alles abge
 - [x] Etappe 2: Bottom-Nav (Notizen/Freunde/Suche/Einstellungen), ☰-Menü entfernt, Suche in die Notizen-Ansicht
 - [x] Etappe 3: Einstellungen-Screen (Design/Sprache/Konto & Name)
 - [x] Etappe 4: Manrope-Schrift + SVG-Icons LOKAL (kein CDN), Mikrofon-FAB fest auf Home
-- [x] Fix: Konto & Name — lange E-Mail wird abgeschnitten (Titel + kleine E-Mail/Name darunter)
+- [x] Etappe 5: Editor-Ansicht — erbt Theme (Teal/Manrope) + Bottom-Nav im Editor ausgeblendet (Vollbild)
+- [x] Startbildschirm (Vorlagen), Login-/Konto-Modal, Freunde: Theme geerbt, konsistent
+- [x] Fix: Konto & Name — lange E-Mail abgeschnitten (Titel + kleine E-Mail/Name darunter)
 - [x] Fix: Suche schließen (✕-Knopf + Enter blurrt) → Tastatur weg, Footer wieder da
+- [x] Features: Push nennt echten Namen + "hat eine Teilaufgabe hinzugefügt" (notify deployt); Nickname↔Username-Sync
 
-## Noch offen
-- [ ] **Etappe 5: Editor-Ansicht** (geöffnete Notiz: Werkzeugleiste, Titel, Teilaufgaben, Eingabefeld) im gleichen Glass/Teal-Stil nachziehen — größter verbleibender Stilbruch
-- [ ] **Safe-Area oben** auf Home prüfen/fixen (sitzt „Alle Notizen" sauber unter Uhr/Akku/Notch?)
-- [ ] **Status-Filter-Chips** (Alle / 🔴🟡🟢) — behalten, umbauen oder entfernen? (optischer Rest)
-- [ ] **i18n** für neue Texte: Bottom-Nav-Labels, Einstellungen-Labels, „Angeheftet", „Teilaufgaben", Titel „Einstellungen" — EN-Übersetzungen ergänzen (aktuell fest deutsch)
-- [ ] **Login-/Konto-Modal** (`openAuth`) noch im alten Stil → an neues Design anpassen
-- [ ] **Leerer Startbildschirm** (Vorlagen-Kacheln) an neues Theme angleichen
+## Noch offen (vor App-Store-Einreichung / optional)
+- [ ] **Safe-Area oben** am echten iPhone final prüfen (Titel/Editor-Leiste unter Uhr/Akku) — Regeln sind gesetzt, nur Geräte-Check
+- [ ] **i18n / EN** für die neuen Texte (Bottom-Nav, Einstellungen, „Angeheftet", „Teilaufgaben", „Einstellungen"-Titel) — aktuell fest deutsch; für App-Store (Primärsprache Englisch) nötig
+- [ ] **Status-Filter-Chips** (Alle / 🔴🟡🟢) — behalten (funktional); optisch später evtl. verfeinern
 - [ ] **Desktop-Sidebar** noch alter Stil (mobil-first, niedrige Prio)
-- [ ] Optional: **Header** aufhübschen (größerer „SmartNote"-Schriftzug / cleaner wie Mockup)
+- [ ] Optional: Header aufhübschen (größerer „SmartNote"-Schriftzug)
 
 ## Danach
-- [ ] Auf echtem iPhone testen (Branch-Build)
-- [ ] Nach `main` mergen + neuer TestFlight-Build (Version hochzählen)
+- [ ] Finaler Geräte-Test (Branch-Build)
+- [ ] Version hochzählen (1.6.8) → nach `main` mergen → TestFlight-Build
