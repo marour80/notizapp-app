@@ -66,7 +66,8 @@
       </div>
       <div id="listSearch" class="list-search">
         <span class="ls-ic">🔍</span>
-        <input id="searchInput" type="text" data-i18n-ph="search" placeholder="Suchen…" autocomplete="off" />
+        <input id="searchInput" type="text" data-i18n-ph="search" placeholder="Suchen…" autocomplete="off" enterkeyhint="search" />
+        <button id="searchClose" class="ls-close" title="Suche schließen" aria-label="Suche schließen">✕</button>
       </div>
       <div class="status-filter">
         <button data-filter="all" class="active" data-i18n="filterAll">Alle</button>
@@ -194,9 +195,12 @@
           <span class="setting-label">🌐 Sprache</span>
           <span id="setLangVal" class="setting-val"></span>
         </button>
-        <button id="setAccountRow" class="setting-row">
-          <span class="setting-label">👤 Konto &amp; Name</span>
-          <span id="setAccountVal" class="setting-arrow">›</span>
+        <button id="setAccountRow" class="setting-row setting-account">
+          <span class="setting-acc">
+            <span class="acc-title">👤 Konto &amp; Name</span>
+            <span id="setAccountSub" class="acc-sub"></span>
+          </span>
+          <span class="setting-arrow">›</span>
         </button>
       </div>
       <div id="setVersion" class="settings-version"></div>

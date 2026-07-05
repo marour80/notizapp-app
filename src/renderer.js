@@ -1964,9 +1964,18 @@ function openSettings() {
     const lang = (window.NZI18N && typeof NZI18N.lang === 'function') ? NZI18N.lang() : (document.documentElement.lang || 'de');
     $('setLangVal').textContent = String(lang).toUpperCase();
   }
-  if ($('setAccountVal')) {
+  if ($('setAccountSub')) {
     const acc = $('accountBtn');
-    $('setAccountVal').textContent = acc && acc._secured ? (acc._email || '✓') : '›';
+    const email = (acc && acc._email) || '';
+    $('setAccountSub').textContent = email || 'Nicht angemeldet';
+    // Name/@username ergaenzen, falls Cloud-Profil vorhanden
+    if (window.NZProfile && NZProfile.getMyProfile) {
+      NZProfile.getMyProfile().then((p) => {
+        if (p && p.username && $('setAccountSub')) {
+          $('setAccountSub').textContent = (email ? email + '  ·  ' : '') + '@' + p.username;
+        }
+      }).catch(() => {});
+    }
   }
   if ($('setVersion') && $('appVersion')) $('setVersion').textContent = $('appVersion').textContent;
   $('settingsModal').classList.remove('hidden');
@@ -1977,6 +1986,17 @@ $('settingsModal').onclick = (e) => { if (e.target === $('settingsModal')) close
 $('setThemeRow').onclick = () => { $('themeToggle').click(); openSettings(); };
 $('setLangRow').onclick = () => { if ($('langToggle')) $('langToggle').click(); openSettings(); };
 $('setAccountRow').onclick = () => { closeSettings(); $('accountBtn').click(); };
+
+// ---- Suche schließen / Tastatur wegtippen ----
+if ($('searchClose')) $('searchClose').onclick = () => {
+  const s = $('searchInput');
+  if (s) { s.value = ''; s.dispatchEvent(new Event('input')); s.blur(); }
+  document.body.classList.remove('search-open');
+  setActiveTab('notes');
+};
+if ($('searchInput')) $('searchInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } // Enter schließt die Tastatur
+});
 $('scrim').onclick = () => setNav(false);
 $('backBtn').onclick = () => document.body.classList.remove('editor-open');
 

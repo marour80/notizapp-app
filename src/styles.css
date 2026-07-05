@@ -1510,3 +1510,31 @@ input, textarea, [contenteditable], .body-input, .preview {
 .settings-list .setting-val { color: var(--accent); font-weight: 700; }
 .settings-list .setting-arrow { color: var(--text-faint); font-size: 20px; line-height: 1; }
 .settings-version { text-align: center; color: var(--text-faint); font-size: 11px; margin-top: 16px; }
+
+/* Such-Leiste: Schließen-Knopf (Tastatur wegtippen) */
+.list-search .ls-close {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  border-radius: 6px;
+}
+.list-search .ls-close:hover { color: var(--text); background: var(--bg-3); }
+
+/* Einstellungen: Konto & Name – Titel + kleine, abgeschnittene E-Mail/Name */
+.settings-list .setting-account { align-items: center; }
+.setting-acc { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; flex: 1; }
+.setting-acc .acc-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.setting-acc .acc-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.setting-acc .acc-sub:empty { display: none; }
