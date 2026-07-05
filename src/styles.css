@@ -1543,3 +1543,20 @@ input, textarea, [contenteditable], .body-input, .preview {
 @media (max-width: 760px) {
   body.editor-open .bottom-nav { display: none; }
 }
+
+/* Teilaufgaben: Wischen zum Löschen + "Gelöscht"-Gruppe (Papierkorb) */
+.sub-item { transition: background 0.12s, transform 0.15s ease, opacity 0.15s ease; touch-action: pan-y; }
+.sub-item.dragging { transition: none; }
+.sub-item.deleted .sub-text { color: var(--text-faint); text-decoration: line-through; opacity: 0.75; }
+.sub-item .sub-restore {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 15px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  line-height: 1;
+}
+.sub-item .sub-restore:hover { background: var(--bg-3); }
+.deleted-group .done-label { color: var(--danger); }

@@ -232,7 +232,7 @@ function renderNoteList() {
     const hasSubs = (n.subtasks || []).length > 0;
     const li = document.createElement('li');
     li.className = 'note-card status-' + status + (n.pinned ? ' pinned' : '') + (n.id === activeNoteId ? ' active' : '');
-    const subs = n.subtasks || [];
+    const subs = (n.subtasks || []).filter((s) => !s.deleted); // gelöschte zählen nicht
     const subDone = subs.filter((s) => (s.status || 'todo') === 'done').length;
     const pct = subs.length ? Math.round((subDone / subs.length) * 100) : 0;
     const shareHtml = n.share && n.share.code ? '<span class="card-share">🔗</span>' : '';
@@ -562,21 +562,74 @@ function cycleStatus(id) {
 
 // ---- Subtasks ----
 let doneGroupOpen = false; // erledigte Teilaufgaben: Gruppe auf/zu
+let deletedGroupOpen = false; // gelöschte Teilaufgaben: "Papierkorb"-Gruppe auf/zu
+
+// Wischen nach links auf einer Teilaufgabe → löschen (soft), wie bei Notizen.
+function attachSubSwipe(li, stId) {
+  let startX = 0, startY = 0, decided = null, active = false;
+  li.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    active = true; decided = null; startX = e.clientX; startY = e.clientY;
+  });
+  li.addEventListener('pointermove', (e) => {
+    if (!active) return;
+    const mx = e.clientX - startX, my = e.clientY - startY;
+    if (decided === null) {
+      if (Math.abs(mx) < 10 && Math.abs(my) < 10) return;
+      decided = Math.abs(mx) > Math.abs(my) ? 'h' : 'v';
+      if (decided === 'h') { li.classList.add('dragging'); try { li.setPointerCapture(e.pointerId); } catch {} }
+    }
+    if (decided !== 'h') return;
+    const dx = Math.max(-140, Math.min(0, mx));
+    li.style.transform = 'translateX(' + dx + 'px)';
+    li.style.opacity = String(Math.max(0.3, 1 + dx / 170));
+    e.preventDefault();
+  });
+  const end = (e) => {
+    if (!active) return;
+    active = false;
+    li.classList.remove('dragging');
+    const mx = ((e && typeof e.clientX === 'number') ? e.clientX : startX) - startX;
+    if (decided === 'h' && mx < -80) {
+      const input = li.querySelector('.sub-text'); if (input) input.blur();
+      li.style.transform = 'translateX(-100%)';
+      li.style.opacity = '0';
+      setTimeout(() => deleteSubtask(stId), 130);
+    } else {
+      li.style.transform = '';
+      li.style.opacity = '';
+    }
+  };
+  li.addEventListener('pointerup', end);
+  li.addEventListener('pointercancel', end);
+}
 
 // Baut eine einzelne Teilaufgaben-Zeile (li) – für offene UND erledigte verwendet.
 function buildSubItem(st, note, noteShared) {
   const status = st.status || 'todo';
+  const isDeleted = !!st.deleted;
   const li = document.createElement('li');
-  li.className = 'sub-item' + (status === 'done' ? ' done' : '');
+  li.className = 'sub-item' + (status === 'done' ? ' done' : '') + (isDeleted ? ' deleted' : '');
+  const actions = isDeleted
+    ? `<button class="sub-restore" title="${t('restore')}">↩</button>
+       <button class="sub-del" title="${t('deleteForever')}">✕</button>`
+    : `<button class="sub-photo" title="${t(st.photo ? 'photo' : 'addPhoto')}">📷</button>
+       <button class="sub-del" title="${t('deleteSubtask')}">✕</button>`;
   li.innerHTML = `
       <span class="dot dot-${status}" title="${statusLabel(status)} ${t('clickToCycle')}"></span>
-      <input class="sub-text" type="text" value="" />
+      <input class="sub-text" type="text" value="" ${isDeleted ? 'readonly' : ''} />
       ${st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : ''}
-      ${noteShared ? whoBadge(note, st) : ''}
-      <button class="sub-photo" title="${t(st.photo ? 'photo' : 'addPhoto')}">📷</button>
-      <button class="sub-del" title="${t('deleteSubtask')}">✕</button>`;
+      ${noteShared && !isDeleted ? whoBadge(note, st) : ''}
+      ${actions}`;
   const input = li.querySelector('.sub-text');
   input.value = st.text || '';
+  const thumb = li.querySelector('.sub-thumb');
+  if (thumb) thumb.onclick = () => openPhoto(st.id);
+  if (isDeleted) {
+    li.querySelector('.sub-restore').onclick = () => restoreSubtask(st.id);
+    li.querySelector('.sub-del').onclick = () => purgeSubtask(st.id);
+    return li;
+  }
   li.querySelector('.dot').onclick = () => cycleSubtask(st.id);
   input.oninput = () => {
     st.text = input.value;
@@ -590,9 +643,8 @@ function buildSubItem(st, note, noteShared) {
     }
   };
   li.querySelector('.sub-photo').onclick = () => pickSubtaskPhoto(st.id);
-  const thumb = li.querySelector('.sub-thumb');
-  if (thumb) thumb.onclick = () => openPhoto(st.id);
   li.querySelector('.sub-del').onclick = () => deleteSubtask(st.id);
+  attachSubSwipe(li, st.id); // Wischen zum Löschen (wie bei Notizen)
   return li;
 }
 
@@ -604,13 +656,15 @@ function renderSubtasks() {
   if (!note.subtasks) note.subtasks = [];
 
   const noteShared = !!(note.share && note.share.code);
-  const active = note.subtasks.filter((s) => (s.status || 'todo') !== 'done');
-  const done = note.subtasks.filter((s) => (s.status || 'todo') === 'done');
+  const live = note.subtasks.filter((s) => !s.deleted); // nicht gelöschte
+  const active = live.filter((s) => (s.status || 'todo') !== 'done');
+  const done = live.filter((s) => (s.status || 'todo') === 'done');
+  const deleted = note.subtasks.filter((s) => s.deleted);
 
   // Offene zuerst, in ihrer normalen Reihenfolge.
   active.forEach((st) => listEl.appendChild(buildSubItem(st, note, noteShared)));
 
-  // Erledigte gebündelt in eine zusammenklappbare Gruppe ganz unten.
+  // Erledigte gebündelt in eine zusammenklappbare Gruppe.
   if (done.length) {
     const header = document.createElement('li');
     header.className = 'done-group' + (doneGroupOpen ? ' open' : '');
@@ -625,6 +679,21 @@ function renderSubtasks() {
     }
   }
 
+  // Gelöschte ("Papierkorb") gebündelt ganz unten – wiederherstellbar.
+  if (deleted.length) {
+    const header = document.createElement('li');
+    header.className = 'done-group deleted-group' + (deletedGroupOpen ? ' open' : '');
+    header.innerHTML = `<span class="done-caret">▸</span><span class="done-label">${t('deletedGroup', { n: deleted.length })}</span>`;
+    header.onclick = () => {
+      deletedGroupOpen = !deletedGroupOpen;
+      renderSubtasks();
+    };
+    listEl.appendChild(header);
+    if (deletedGroupOpen) {
+      deleted.forEach((st) => listEl.appendChild(buildSubItem(st, note, noteShared)));
+    }
+  }
+
   applyAutoStatus(note);
   updateSubProgress(note);
   renderStatusRow(note.status || 'todo');
@@ -632,7 +701,7 @@ function renderSubtasks() {
 }
 
 function updateSubProgress(note) {
-  const subs = note.subtasks || [];
+  const subs = (note.subtasks || []).filter((s) => !s.deleted);
   const done = subs.filter((s) => (s.status || 'todo') === 'done').length;
   $('subProgress').textContent = subs.length ? t('progressDone', { done, total: subs.length }) : '';
 }
@@ -684,11 +753,38 @@ function whoBadge(note, st) {
 }
 
 function deleteSubtask(stId) {
+  // Soft-Delete: Teilaufgabe wandert in die "Gelöscht"-Gruppe (wiederherstellbar), statt weg zu sein.
+  const note = currentNote();
+  if (!note) return;
+  const st = (note.subtasks || []).find((s) => s.id === stId);
+  if (!st) return;
+  st.deleted = true;
+  st.deletedAt = Date.now();
+  note.updatedAt = Date.now();
+  applyAutoStatus(note);
+  persist();
+  renderSubtasks();
+  renderNoteList();
+}
+function restoreSubtask(stId) {
+  const note = currentNote();
+  if (!note) return;
+  const st = (note.subtasks || []).find((s) => s.id === stId);
+  if (!st) return;
+  delete st.deleted;
+  delete st.deletedAt;
+  note.updatedAt = Date.now();
+  applyAutoStatus(note);
+  persist();
+  renderSubtasks();
+  renderNoteList();
+}
+function purgeSubtask(stId) {
+  // Endgültig entfernen (aus der "Gelöscht"-Gruppe).
   const note = currentNote();
   if (!note) return;
   note.subtasks = note.subtasks.filter((s) => s.id !== stId);
   note.updatedAt = Date.now();
-  applyAutoStatus(note);
   persist();
   renderSubtasks();
   renderNoteList();

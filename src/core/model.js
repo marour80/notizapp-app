@@ -26,7 +26,7 @@
 
   // Status einer Notiz aus ihren Teilaufgaben ableiten (falls vorhanden).
   function deriveStatus(note) {
-    const subs = (note && note.subtasks) || [];
+    const subs = ((note && note.subtasks) || []).filter((s) => !s.deleted);
     if (!subs.length) return (note && note.status) || 'todo';
     const states = subs.map((s) => s.status || 'todo');
     if (states.every((s) => s === 'done')) return 'done';
