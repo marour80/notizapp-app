@@ -12,6 +12,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+  <link rel="stylesheet" href="fonts/manrope.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -92,22 +93,26 @@
       </div>
     </section>
 
-    <button id="fabVoice" class="fab fab-voice hidden" data-i18n-title="voiceNoteTitle" data-i18n-aria="voiceNoteTitle" title="Sprachnotiz aufnehmen" aria-label="Sprachnotiz aufnehmen">🎤</button>
-    <button id="fabNew" class="fab" data-i18n-title="newNoteTitle" data-i18n-aria="newNoteTitle" title="Neue Notiz" aria-label="Neue Notiz">+</button>
+    <button id="fabVoice" class="fab fab-voice" data-i18n-title="voiceNoteTitle" data-i18n-aria="voiceNoteTitle" title="Sprachnotiz aufnehmen" aria-label="Sprachnotiz aufnehmen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/></svg></button>
+    <button id="fabNew" class="fab" data-i18n-title="newNoteTitle" data-i18n-aria="newNoteTitle" title="Neue Notiz" aria-label="Neue Notiz"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
 
     <!-- Bottom-Navigation (nur mobil) -->
     <nav id="bottomNav" class="bottom-nav">
       <button class="bnav-item active" data-nav="notes">
-        <span class="bnav-ic">🏠</span><span class="bnav-lbl">Notizen</span>
+        <span class="bnav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span>
+        <span class="bnav-lbl">Notizen</span>
       </button>
       <button class="bnav-item" data-nav="friends">
-        <span class="bnav-ic">👥</span><span class="bnav-lbl">Freunde</span>
+        <span class="bnav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><path d="M16 5.3a3 3 0 0 1 0 5.4"/><path d="M17.6 14.7c1.9.7 3.4 2.6 3.4 5.3"/></svg></span>
+        <span class="bnav-lbl">Freunde</span>
       </button>
       <button class="bnav-item" data-nav="search">
-        <span class="bnav-ic">🔎</span><span class="bnav-lbl">Suche</span>
+        <span class="bnav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg></span>
+        <span class="bnav-lbl">Suche</span>
       </button>
       <button class="bnav-item" data-nav="settings">
-        <span class="bnav-ic">⚙️</span><span class="bnav-lbl">Einstellungen</span>
+        <span class="bnav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.6v3.1M12 18.3v3.1M2.6 12h3.1M18.3 12h3.1M5.2 5.2l2.2 2.2M16.6 16.6l2.2 2.2M18.8 5.2l-2.2 2.2M7.4 16.6l-2.2 2.2"/></svg></span>
+        <span class="bnav-lbl">Einstellungen</span>
       </button>
     </nav>
 
@@ -175,6 +180,29 @@
   </div>
 
   <!-- Teilen-Dialog -->
+  <!-- Einstellungen -->
+  <div id="settingsModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" id="settingsClose">✕</button>
+      <h2>⚙️ Einstellungen</h2>
+      <div class="settings-list">
+        <button id="setThemeRow" class="setting-row">
+          <span class="setting-label">🌗 Design</span>
+          <span id="setThemeVal" class="setting-val"></span>
+        </button>
+        <button id="setLangRow" class="setting-row">
+          <span class="setting-label">🌐 Sprache</span>
+          <span id="setLangVal" class="setting-val"></span>
+        </button>
+        <button id="setAccountRow" class="setting-row">
+          <span class="setting-label">👤 Konto &amp; Name</span>
+          <span id="setAccountVal" class="setting-arrow">›</span>
+        </button>
+      </div>
+      <div id="setVersion" class="settings-version"></div>
+    </div>
+  </div>
+
   <div id="shareModal" class="modal-overlay hidden">
     <div class="modal">
       <button class="modal-close" id="shareClose">✕</button>

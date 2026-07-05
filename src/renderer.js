@@ -1951,10 +1951,32 @@ document.querySelectorAll('#bottomNav .bnav-item').forEach((btn) => {
       setActiveTab(on ? 'search' : 'notes');
       if (on) setTimeout(() => { const s = $('searchInput'); if (s) s.focus(); }, 60);
     } else if (nav === 'settings') {
-      setNav(true);
+      openSettings();
     }
   };
 });
+
+// ---- Einstellungen-Screen (nutzt die bestehende Theme-/Sprache-/Konto-Logik) ----
+function openSettings() {
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  if ($('setThemeVal')) $('setThemeVal').textContent = isDark ? t('themeDark') : t('themeLight');
+  if ($('setLangVal')) {
+    const lang = (window.NZI18N && typeof NZI18N.lang === 'function') ? NZI18N.lang() : (document.documentElement.lang || 'de');
+    $('setLangVal').textContent = String(lang).toUpperCase();
+  }
+  if ($('setAccountVal')) {
+    const acc = $('accountBtn');
+    $('setAccountVal').textContent = acc && acc._secured ? (acc._email || '✓') : '›';
+  }
+  if ($('setVersion') && $('appVersion')) $('setVersion').textContent = $('appVersion').textContent;
+  $('settingsModal').classList.remove('hidden');
+}
+function closeSettings() { $('settingsModal').classList.add('hidden'); }
+$('settingsClose').onclick = closeSettings;
+$('settingsModal').onclick = (e) => { if (e.target === $('settingsModal')) closeSettings(); };
+$('setThemeRow').onclick = () => { $('themeToggle').click(); openSettings(); };
+$('setLangRow').onclick = () => { if ($('langToggle')) $('langToggle').click(); openSettings(); };
+$('setAccountRow').onclick = () => { closeSettings(); $('accountBtn').click(); };
 $('scrim').onclick = () => setNav(false);
 $('backBtn').onclick = () => document.body.classList.remove('editor-open');
 
