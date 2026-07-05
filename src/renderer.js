@@ -1264,6 +1264,8 @@ async function loadUsernameField() {
   try {
     const p = await NZProfile.getMyProfile();
     $('usernameInput').value = p && p.username ? '@' + p.username : '';
+    // Echten Namen fuer die "wer war's"-Spur / Push uebernehmen (statt Zufallsname "Flinker Luchs")
+    if (p && p.username && window.NZDevice) NZDevice.setProfile({ nickname: p.username });
   } catch {}
 }
 async function saveUsername() {
@@ -1275,6 +1277,7 @@ async function saveUsername() {
     const display = (info && info.email) || NZDevice.me().nickname;
     const uname = await NZProfile.setUsername($('usernameInput').value, display);
     $('usernameInput').value = '@' + uname;
+    if (window.NZDevice) NZDevice.setProfile({ nickname: uname }); // Name mit Username syncen
     showSmallMsg(msg, t('usernameSaved'), false);
   } catch (e) {
     const m =

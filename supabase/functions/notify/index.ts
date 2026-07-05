@@ -65,7 +65,19 @@ Deno.serve(async (req) => {
     const noteId: string = note.id;
     const actor: string | null = note.last_actor || null;
     const title: string = (note.data && note.data.title) || 'Geteilte Notiz';
-    console.log('notify: noteId=' + noteId + ' share_code=' + (note.share_code || '-') + ' actor=' + (actor || '-'));
+    // Name des Verursachers + ob eine Teilaufgabe hinzugefuegt wurde (fuer eine schoene Nachricht)
+    const oldNote = payload.old_record || payload.old || {};
+    const subs: any[] = (note.data && note.data.subtasks) || [];
+    const oldSubs: any[] = (oldNote.data && oldNote.data.subtasks) || [];
+    const actorCand = subs
+      .filter((s) => s && s.updatedBy && s.updatedBy.id === actor)
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    const who: string = (actorCand[0] && actorCand[0].updatedBy && actorCand[0].updatedBy.nickname) || 'Jemand';
+    const addedSubtask = subs.length > oldSubs.length;
+    const bodyText = addedSubtask
+      ? `${who} hat eine Teilaufgabe zu „${title}" hinzugefügt.`
+      : `${who} hat „${title}" aktualisiert.`;
+    console.log('notify: noteId=' + noteId + ' share_code=' + (note.share_code || '-') + ' actor=' + (actor || '-') + ' who=' + who + ' added=' + addedSubtask);
     // Nur geteilte Notizen sind relevant (sonst gibt es ohnehin keine Mitglieder).
     if (!noteId || !note.share_code) {
       console.log('notify: skip (nicht geteilt)');
@@ -106,7 +118,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           message: {
             token,
-            notification: { title: 'SmartNote', body: `„${title}" wurde aktualisiert.` },
+            notification: { title: 'SmartNote', body: bodyText },
             data: { noteId },
             android: { priority: 'HIGH', notification: { sound: 'default' } }
           }
