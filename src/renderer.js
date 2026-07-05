@@ -231,25 +231,37 @@ function renderNoteList() {
     const status = deriveStatus(n);
     const hasSubs = (n.subtasks || []).length > 0;
     const li = document.createElement('li');
-    li.className = 'note-card status-' + status + (n.id === activeNoteId ? ' active' : '');
+    li.className = 'note-card status-' + status + (n.pinned ? ' pinned' : '') + (n.id === activeNoteId ? ' active' : '');
     const subs = n.subtasks || [];
     const subDone = subs.filter((s) => (s.status || 'todo') === 'done').length;
-    const subHtml = subs.length
-      ? `<span class="card-sub">☑ ${subDone}/${subs.length}</span>`
-      : '';
+    const pct = subs.length ? Math.round((subDone / subs.length) * 100) : 0;
     const shareHtml = n.share && n.share.code ? '<span class="card-share">🔗</span>' : '';
     const snippet = escapeHtml(stripMd(n.body || ''));
+    const catLabel = n.folder ? escapeHtml(n.folder) : statusLabel(status);
+    const bodyHtml = subs.length
+      ? `<div class="card-progress">
+           <div class="prog-row">
+             <span class="prog-label">${t('subtasks')}</span>
+             <span class="prog-count">${subDone}/${subs.length}</span>
+           </div>
+           <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+         </div>`
+      : `<div class="snippet">${snippet || t('noContent')}</div>`;
     li.innerHTML = `
       <button class="card-pin" aria-label="${t(n.pinned ? 'unpin' : 'pin')}" title="${t(n.pinned ? 'unpin' : 'pin')}">📌</button>
       <button class="card-delete" aria-label="${t('delete')}" title="${t('delete')}">🗑</button>
       <div class="card-inner">
-        <div class="card-title-row">
-          <span class="dot dot-${status}" title="${statusLabel(status)}${hasSubs ? ' ' + t('fromSubtasks') : ' ' + t('clickToCycle')}"></span>
-          ${n.pinned ? '<span class="card-pinned" title="' + t('pinned') + '">📌</span>' : ''}
-          <h3>${escapeHtml(n.title) || t('untitled')}</h3>
+        <div class="card-top">
+          <div class="card-cat">
+            <span class="dot dot-${status}" title="${statusLabel(status)}${hasSubs ? ' ' + t('fromSubtasks') : ' ' + t('clickToCycle')}"></span>
+            <span class="cat-label">${catLabel}</span>
+            ${n.pinned ? '<span class="card-pinned">📌 ' + t('pinned') + '</span>' : ''}
+          </div>
+          ${shareHtml}
         </div>
-        <div class="snippet">${snippet || (subs.length ? subs.map((s) => '• ' + escapeHtml(s.text)).join('  ') : t('noContent'))}</div>
-        <div class="card-meta">${shareHtml}${subHtml}<span>${formatDate(n.updatedAt)}</span></div>
+        <h3>${escapeHtml(n.title) || t('untitled')}</h3>
+        ${bodyHtml}
+        <div class="card-meta"><span>${formatDate(n.updatedAt)}</span>${n.folder ? '<span class="card-tag">' + escapeHtml(n.folder) + '</span>' : ''}</div>
       </div>`;
     const inner = li.querySelector('.card-inner');
     inner.querySelector('.dot').onclick = (e) => {
@@ -1919,7 +1931,30 @@ function setNav(open) {
   document.body.classList.toggle('nav-open', open);
   $('scrim').classList.toggle('hidden', !open);
 }
-$('menuBtn').onclick = () => setNav(!document.body.classList.contains('nav-open'));
+// ---- Bottom-Navigation (mobil) – ersetzt das ☰-Menü ----
+function setActiveTab(name) {
+  document.querySelectorAll('#bottomNav .bnav-item').forEach((b) => b.classList.toggle('active', b.dataset.nav === name));
+}
+document.querySelectorAll('#bottomNav .bnav-item').forEach((btn) => {
+  btn.onclick = () => {
+    const nav = btn.dataset.nav;
+    if (nav === 'notes') {
+      document.body.classList.remove('editor-open', 'search-open');
+      setNav(false);
+      setActiveTab('notes');
+    } else if (nav === 'friends') {
+      const fb = $('friendsBtn');
+      if (fb && !fb.classList.contains('hidden')) fb.click();
+      else $('joinBtn').click();
+    } else if (nav === 'search') {
+      const on = document.body.classList.toggle('search-open');
+      setActiveTab(on ? 'search' : 'notes');
+      if (on) setTimeout(() => { const s = $('searchInput'); if (s) s.focus(); }, 60);
+    } else if (nav === 'settings') {
+      setNav(true);
+    }
+  };
+});
 $('scrim').onclick = () => setNav(false);
 $('backBtn').onclick = () => document.body.classList.remove('editor-open');
 

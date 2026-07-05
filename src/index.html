@@ -41,10 +41,6 @@
         🎤 <span data-i18n="voiceNote">Sprachnotiz</span>
       </button>
 
-      <div class="search-box">
-        <input id="searchInput" type="text" data-i18n-ph="search" placeholder="Suchen…" autocomplete="off" />
-      </div>
-
       <nav class="folders">
         <div class="folders-head">
           <span data-i18n="folders">Ordner</span>
@@ -64,9 +60,12 @@
     <!-- Note list -->
     <section class="note-list-panel">
       <div class="list-header">
-        <button id="menuBtn" class="mobile-only icon-btn" data-i18n-title="menu" title="Menü">☰</button>
         <h2 id="listTitle">Alle Notizen</h2>
         <span id="noteCount" class="count">0</span>
+      </div>
+      <div id="listSearch" class="list-search">
+        <span class="ls-ic">🔍</span>
+        <input id="searchInput" type="text" data-i18n-ph="search" placeholder="Suchen…" autocomplete="off" />
       </div>
       <div class="status-filter">
         <button data-filter="all" class="active" data-i18n="filterAll">Alle</button>
@@ -95,6 +94,22 @@
 
     <button id="fabVoice" class="fab fab-voice hidden" data-i18n-title="voiceNoteTitle" data-i18n-aria="voiceNoteTitle" title="Sprachnotiz aufnehmen" aria-label="Sprachnotiz aufnehmen">🎤</button>
     <button id="fabNew" class="fab" data-i18n-title="newNoteTitle" data-i18n-aria="newNoteTitle" title="Neue Notiz" aria-label="Neue Notiz">+</button>
+
+    <!-- Bottom-Navigation (nur mobil) -->
+    <nav id="bottomNav" class="bottom-nav">
+      <button class="bnav-item active" data-nav="notes">
+        <span class="bnav-ic">🏠</span><span class="bnav-lbl">Notizen</span>
+      </button>
+      <button class="bnav-item" data-nav="friends">
+        <span class="bnav-ic">👥</span><span class="bnav-lbl">Freunde</span>
+      </button>
+      <button class="bnav-item" data-nav="search">
+        <span class="bnav-ic">🔎</span><span class="bnav-lbl">Suche</span>
+      </button>
+      <button class="bnav-item" data-nav="settings">
+        <span class="bnav-ic">⚙️</span><span class="bnav-lbl">Einstellungen</span>
+      </button>
+    </nav>
 
     <!-- Editor -->
     <main class="editor-panel">
