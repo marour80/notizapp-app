@@ -1164,9 +1164,14 @@ async function doUnshare() {
 function updateSharedBadge(note) {
   const shared = !!(note && note.share && note.share.code);
   $('sharedBadge').classList.toggle('hidden', !shared);
-  $('sharedBadge').textContent = shared
-    ? (note.ownedByMe === false ? t('sharedBy') : t('shared') + ' · ' + note.share.code)
-    : '';
+  if (!shared) { $('sharedBadge').textContent = ''; return; }
+  if (note.ownedByMe === false) {
+    // Notiz wurde MIT mir geteilt → Namen des Teilers zeigen (statt "jemand")
+    const name = (note.share.createdBy && note.share.createdBy.nickname) || t('someone');
+    $('sharedBadge').textContent = t('sharedByName', { name });
+  } else {
+    $('sharedBadge').textContent = t('shared') + ' · ' + note.share.code;
+  }
 }
 
 // Live-Präsenz (wer ist gerade in dieser Notiz?)
