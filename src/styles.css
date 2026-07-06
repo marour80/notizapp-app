@@ -256,7 +256,7 @@ input, textarea, [contenteditable], .body-input, .preview {
   flex-shrink: 0;
 }
 .dot-todo { background: #ff5c72; box-shadow: 0 0 0 3px rgba(255,92,114,0.18); }
-.dot-doing { background: #ffb340; box-shadow: 0 0 0 3px rgba(255,179,64,0.18); }
+.dot-doing { background: #a78bfa; box-shadow: 0 0 0 3px rgba(167,139,250,0.18); }
 .dot-done { background: #3ad17a; box-shadow: 0 0 0 3px rgba(58,209,122,0.18); }
 
 .status-row {
@@ -346,7 +346,7 @@ input, textarea, [contenteditable], .body-input, .preview {
   --sc: var(--accent); /* Statusfarbe (Akzentlinie + Fortschritt) */
 }
 .note-card.status-todo { --sc: #ff5c72; }
-.note-card.status-doing { --sc: #ffb340; }
+.note-card.status-doing { --sc: #a78bfa; }
 .note-card.status-done  { --sc: #3ad17a; }
 .note-card .card-inner {
   position: relative;
@@ -1544,9 +1544,46 @@ input, textarea, [contenteditable], .body-input, .preview {
   body.editor-open .bottom-nav { display: none; }
 }
 
-/* Teilaufgaben: Wischen zum Löschen + "Gelöscht"-Gruppe (Papierkorb) */
-.sub-item { transition: background 0.12s, transform 0.15s ease, opacity 0.15s ease; touch-action: pan-y; }
-.sub-item.dragging { transition: none; }
+/* Teilaufgaben: Wischen deckt roten Lösch-Knopf auf (wie Notizen) + "Gelöscht"-Gruppe */
+.sub-item {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  touch-action: pan-y;
+}
+.sub-item:hover { background: transparent; }
+.sub-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 4px;
+  border-radius: 8px;
+  background: var(--bg-2);
+  transform: translateX(0);
+  transition: transform 0.18s ease;
+  position: relative;
+  z-index: 1;
+}
+.sub-item:hover .sub-inner { background: var(--bg-3); }
+.sub-item.dragging .sub-inner { transition: none; }
+.sub-item.swiped .sub-inner { transform: translateX(-72px); }
+.sub-swipe-del {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 72px;
+  border: none;
+  background: var(--danger);
+  color: #fff;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 0;
+  border-radius: 0 8px 8px 0;
+}
+.sub-swipe-del:active { filter: brightness(0.9); }
 .sub-item.deleted .sub-text { color: var(--text-faint); text-decoration: line-through; opacity: 0.75; }
 .sub-item .sub-restore {
   background: none;

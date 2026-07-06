@@ -564,44 +564,55 @@ function cycleStatus(id) {
 let doneGroupOpen = false; // erledigte Teilaufgaben: Gruppe auf/zu
 let deletedGroupOpen = false; // gelöschte Teilaufgaben: "Papierkorb"-Gruppe auf/zu
 
-// Wischen nach links auf einer Teilaufgabe → löschen (soft), wie bei Notizen.
-function attachSubSwipe(li, stId) {
-  let startX = 0, startY = 0, decided = null, active = false;
-  li.addEventListener('pointerdown', (e) => {
+// Wischen nach links deckt einen roten Lösch-Knopf auf (wie bei Notizen) – löscht NICHT sofort.
+let openSwipedSub = null;
+function closeSubSwipe(li) {
+  if (!li) return;
+  li.classList.remove('swiped');
+  if (openSwipedSub === li) openSwipedSub = null;
+}
+function attachSubSwipe(li, inner, stId) {
+  let startX = 0, startY = 0, dx = 0, decided = null, active = false, suppressClick = false;
+  inner.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    active = true; decided = null; startX = e.clientX; startY = e.clientY;
+    active = true; decided = null; dx = 0; startX = e.clientX; startY = e.clientY;
   });
-  li.addEventListener('pointermove', (e) => {
+  inner.addEventListener('pointermove', (e) => {
     if (!active) return;
     const mx = e.clientX - startX, my = e.clientY - startY;
     if (decided === null) {
-      if (Math.abs(mx) < 10 && Math.abs(my) < 10) return;
+      if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
       decided = Math.abs(mx) > Math.abs(my) ? 'h' : 'v';
-      if (decided === 'h') { li.classList.add('dragging'); try { li.setPointerCapture(e.pointerId); } catch {} }
+      if (decided === 'h') {
+        if (openSwipedSub && openSwipedSub !== li) closeSubSwipe(openSwipedSub);
+        li.classList.add('dragging');
+        try { inner.setPointerCapture(e.pointerId); } catch {}
+      }
     }
     if (decided !== 'h') return;
-    const dx = Math.max(-140, Math.min(0, mx));
-    li.style.transform = 'translateX(' + dx + 'px)';
-    li.style.opacity = String(Math.max(0.3, 1 + dx / 170));
+    suppressClick = true;
+    const base = li.classList.contains('swiped') ? -72 : 0;
+    dx = Math.max(-86, Math.min(0, base + mx));
+    inner.style.transform = 'translateX(' + dx + 'px)';
     e.preventDefault();
   });
-  const end = (e) => {
+  const end = () => {
     if (!active) return;
     active = false;
     li.classList.remove('dragging');
-    const mx = ((e && typeof e.clientX === 'number') ? e.clientX : startX) - startX;
-    if (decided === 'h' && mx < -80) {
-      const input = li.querySelector('.sub-text'); if (input) input.blur();
-      li.style.transform = 'translateX(-100%)';
-      li.style.opacity = '0';
-      setTimeout(() => deleteSubtask(stId), 130);
-    } else {
-      li.style.transform = '';
-      li.style.opacity = '';
+    inner.style.transform = '';
+    if (decided === 'h') {
+      if (dx < -36) { li.classList.add('swiped'); openSwipedSub = li; }
+      else closeSubSwipe(li);
     }
   };
-  li.addEventListener('pointerup', end);
-  li.addEventListener('pointercancel', end);
+  inner.addEventListener('pointerup', end);
+  inner.addEventListener('pointercancel', end);
+  // Tipp auf die geöffnete Zeile schließt den Swipe wieder (statt zu editieren).
+  inner.addEventListener('click', (e) => {
+    if (suppressClick) { suppressClick = false; return; }
+    if (li.classList.contains('swiped')) { e.preventDefault(); e.stopPropagation(); closeSubSwipe(li); }
+  }, true);
 }
 
 // Baut eine einzelne Teilaufgaben-Zeile (li) – für offene UND erledigte verwendet.
@@ -613,14 +624,17 @@ function buildSubItem(st, note, noteShared) {
   const actions = isDeleted
     ? `<button class="sub-restore" title="${t('restore')}">↩</button>
        <button class="sub-del" title="${t('deleteForever')}">✕</button>`
-    : `<button class="sub-photo" title="${t(st.photo ? 'photo' : 'addPhoto')}">📷</button>
-       <button class="sub-del" title="${t('deleteSubtask')}">✕</button>`;
+    : `<button class="sub-photo" title="${t(st.photo ? 'photo' : 'addPhoto')}">📷</button>`;
+  const swipeDel = isDeleted ? '' : `<button class="sub-swipe-del" title="${t('deleteSubtask')}">🗑</button>`;
   li.innerHTML = `
-      <span class="dot dot-${status}" title="${statusLabel(status)} ${t('clickToCycle')}"></span>
-      <input class="sub-text" type="text" value="" ${isDeleted ? 'readonly' : ''} />
-      ${st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : ''}
-      ${noteShared && !isDeleted ? whoBadge(note, st) : ''}
-      ${actions}`;
+      ${swipeDel}
+      <div class="sub-inner">
+        <span class="dot dot-${status}" title="${statusLabel(status)} ${t('clickToCycle')}"></span>
+        <input class="sub-text" type="text" value="" ${isDeleted ? 'readonly' : ''} />
+        ${st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : ''}
+        ${noteShared && !isDeleted ? whoBadge(note, st) : ''}
+        ${actions}
+      </div>`;
   const input = li.querySelector('.sub-text');
   input.value = st.text || '';
   const thumb = li.querySelector('.sub-thumb');
@@ -643,8 +657,8 @@ function buildSubItem(st, note, noteShared) {
     }
   };
   li.querySelector('.sub-photo').onclick = () => pickSubtaskPhoto(st.id);
-  li.querySelector('.sub-del').onclick = () => deleteSubtask(st.id);
-  attachSubSwipe(li, st.id); // Wischen zum Löschen (wie bei Notizen)
+  li.querySelector('.sub-swipe-del').onclick = () => deleteSubtask(st.id);
+  attachSubSwipe(li, li.querySelector('.sub-inner'), st.id); // Wischen deckt roten Lösch-Knopf auf
   return li;
 }
 
