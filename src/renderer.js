@@ -619,6 +619,7 @@ function attachSubSwipe(li, inner, stId) {
 function buildSubItem(st, note, noteShared) {
   const status = st.status || 'todo';
   const isDeleted = !!st.deleted;
+  const readOnly = isDeleted || status === 'done'; // erledigte + gelöschte sind nicht editierbar
   const li = document.createElement('li');
   li.className = 'sub-item' + (status === 'done' ? ' done' : '') + (isDeleted ? ' deleted' : '');
   const actions = isDeleted
@@ -630,7 +631,7 @@ function buildSubItem(st, note, noteShared) {
       ${swipeDel}
       <div class="sub-inner">
         <span class="dot dot-${status}" title="${statusLabel(status)} ${t('clickToCycle')}"></span>
-        <input class="sub-text" type="text" value="" ${isDeleted ? 'readonly' : ''} />
+        <input class="sub-text" type="text" value="" ${readOnly ? 'readonly' : ''} />
         ${st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : ''}
         ${noteShared && !isDeleted ? whoBadge(note, st) : ''}
         ${actions}
@@ -644,18 +645,25 @@ function buildSubItem(st, note, noteShared) {
     li.querySelector('.sub-del').onclick = () => purgeSubtask(st.id);
     return li;
   }
+  // Punkt wechselt den Status (bei "erledigt" holt es die Aufgabe zurück zum Bearbeiten).
   li.querySelector('.dot').onclick = () => cycleSubtask(st.id);
-  input.oninput = () => {
-    st.text = input.value;
-    note.updatedAt = Date.now();
-    scheduleSubSave();
-  };
-  input.onkeydown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      focusSubAdd();
-    }
-  };
+  if (!readOnly) {
+    input.oninput = () => {
+      st.text = input.value;
+      note.updatedAt = Date.now();
+      scheduleSubSave();
+    };
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        focusSubAdd();
+      }
+    };
+    // Leere Teilaufgabe (nur Leerzeichen) beim Verlassen entfernen – leer ist nicht erlaubt.
+    input.onblur = () => {
+      if (!input.value.trim()) purgeSubtask(st.id);
+    };
+  }
   li.querySelector('.sub-photo').onclick = () => pickSubtaskPhoto(st.id);
   li.querySelector('.sub-swipe-del').onclick = () => deleteSubtask(st.id);
   attachSubSwipe(li, li.querySelector('.sub-inner'), st.id); // Wischen deckt roten Lösch-Knopf auf
@@ -1277,6 +1285,12 @@ async function updateAccountUI() {
     $('accountBtn')._email = info.email;
     $('accountBtn').textContent = info.secured ? '✓ ' + info.email : t('backup');
     $('accountBtn').classList.toggle('secured', info.secured);
+    // Beim Start den echten Namen (@Username) als Geräte-Nickname übernehmen →
+    // steht dann bei Teilaufgaben/Push statt "Flinker Luchs".
+    if (window.NZProfile && NZProfile.getMyProfile) {
+      const p = await NZProfile.getMyProfile();
+      if (p && p.username && window.NZDevice) NZDevice.setProfile({ nickname: p.username });
+    }
   } catch {}
 }
 
