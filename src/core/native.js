@@ -169,14 +169,30 @@
 
   // ---- Push (Teil 2) ----
   // Registriert das Gerät für Push und liefert den FCM-Token via onToken(token).
+  // Nutzt @capacitor-firebase/messaging → liefert auf iOS UND Android einen echten
+  // FCM-Token (nicht den rohen APNs-Token, den FCM ablehnt).
   async function registerPush(onToken) {
-    const Push = plugin('PushNotifications');
-    if (!Push) return false;
-    const perm = await Push.requestPermissions();
-    if (perm.receive !== 'granted') return false;
-    Push.addListener('registration', (t) => onToken && onToken(t.value));
-    Push.addListener('registrationError', (e) => console.warn('[Push] Fehler:', e));
-    await Push.register();
+    const FM = plugin('FirebaseMessaging');
+    if (!FM) { console.warn('[Push] FirebaseMessaging-Plugin fehlt'); return false; }
+    try {
+      const perm = await FM.requestPermissions();
+      if (perm && perm.receive && perm.receive !== 'granted') {
+        console.warn('[Push] Berechtigung nicht erteilt:', perm.receive);
+        return false;
+      }
+    } catch (e) { console.warn('[Push] requestPermissions:', e); }
+    // Falls der Token später neu ausgestellt wird (z. B. nach APNs-Registrierung).
+    try {
+      FM.addListener('tokenReceived', (ev) => {
+        if (onToken && ev && ev.token) onToken(ev.token);
+      });
+    } catch {}
+    try {
+      const res = await FM.getToken();
+      if (res && res.token && onToken) onToken(res.token);
+    } catch (e) {
+      console.warn('[Push] getToken:', e);
+    }
     return true;
   }
 

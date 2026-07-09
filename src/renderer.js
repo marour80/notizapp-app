@@ -1942,9 +1942,10 @@ if (window.NZNative && NZNative.isNative()) {
 
   // Push registrieren – ABER nur wenn Firebase eingerichtet ist (sonst nativer Absturz).
   if (window.NZ_CONFIG && NZ_CONFIG.PUSH) {
+    const plat = (window.Capacitor && Capacitor.getPlatform && Capacitor.getPlatform()) || 'android';
     NZStore.ready.then(() => {
       NZNative.registerPush((token) => {
-        if (window.NZShare && NZShare.savePushToken) NZShare.savePushToken(token, 'android');
+        if (window.NZShare && NZShare.savePushToken) NZShare.savePushToken(token, plat);
       }).catch(() => {});
     });
   }
