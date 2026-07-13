@@ -58,9 +58,44 @@ async function getAccessToken(sa: any): Promise<string> {
   return json.access_token;
 }
 
+// Einzelnen Push senden – gibt Status + kompletten Antworttext zurück (fürs Debuggen).
+async function sendPush(accessToken: string, projectId: string, token: string, bodyText: string, noteId: string) {
+  const url = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: {
+        token,
+        notification: { title: 'SmartNote', body: bodyText },
+        data: { noteId },
+        android: { priority: 'HIGH', notification: { sound: 'default' } },
+        apns: { payload: { aps: { sound: 'default' } } }
+      }
+    })
+  });
+  const text = r.ok ? '' : await r.text();
+  return { ok: r.ok, status: r.status, text };
+}
+
 Deno.serve(async (req) => {
   try {
     const payload = await req.json();
+
+    // ---- Debug/Test-Modus: {mode:'push-test', device:'<uuid>'} → Push direkt an dieses Gerät ----
+    if (payload && payload.mode === 'push-test') {
+      const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const { data: toks } = await supa.from('push_tokens').select('device, token, platform').eq('device', payload.device);
+      const row = toks && toks[0];
+      if (!row) return new Response(JSON.stringify({ error: 'kein Token für device ' + payload.device }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+      const sa = JSON.parse(atob(Deno.env.get('FCM_SA_B64')!));
+      const accessToken = await getAccessToken(sa);
+      const res = await sendPush(accessToken, sa.project_id, row.token, payload.text || 'Testnachricht 👋', 'test');
+      console.log('notify: PUSH-TEST device=' + payload.device + ' platform=' + row.platform +
+        ' tokenPrefix=' + String(row.token).slice(0, 12) + ' saProject=' + sa.project_id +
+        ' saMail=' + sa.client_email + ' → status=' + res.status + ' ' + res.text.slice(0, 900));
+      return new Response(JSON.stringify({ platform: row.platform, tokenPrefix: String(row.token).slice(0, 12), saProject: sa.project_id, saMail: sa.client_email, status: res.status, ok: res.ok, error: res.text }), { headers: { 'Content-Type': 'application/json' } });
+    }
     const note = payload.record || payload.new || {};
     const noteId: string = note.id;
     const actor: string | null = note.last_actor || null;
@@ -108,27 +143,15 @@ Deno.serve(async (req) => {
 
     const sa = JSON.parse(atob(Deno.env.get('FCM_SA_B64')!));
     const accessToken = await getAccessToken(sa);
-    const url = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
+    console.log('notify: sende via saProject=' + sa.project_id + ' saMail=' + sa.client_email + ' tokenLen=' + accessToken.length);
 
     let sent = 0;
     for (const token of tokens) {
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: {
-            token,
-            notification: { title: 'SmartNote', body: bodyText },
-            data: { noteId },
-            android: { priority: 'HIGH', notification: { sound: 'default' } }
-          }
-        })
-      });
-      if (r.ok) {
+      const res = await sendPush(accessToken, sa.project_id, token, bodyText, noteId);
+      if (res.ok) {
         sent++;
       } else {
-        const errTxt = await r.text();
-        console.log('notify: FCM-Fehler ' + r.status + ': ' + errTxt.slice(0, 300));
+        console.log('notify: FCM-Fehler ' + res.status + ' tokenPrefix=' + String(token).slice(0, 12) + ': ' + res.text.slice(0, 900));
       }
     }
     console.log('notify: FERTIG sent=' + sent + ' von ' + tokens.length);
