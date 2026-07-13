@@ -119,6 +119,13 @@ Deno.serve(async (req) => {
       return new Response('skip', { status: 200 });
     }
 
+    // Die App schreibt beim Sync ALLE Notizen (auch unveränderte) → der Webhook feuert
+    // dann für jede geteilte Notiz. Push nur, wenn sich der INHALT wirklich geändert hat.
+    if (oldNote && oldNote.data && JSON.stringify(note.data) === JSON.stringify(oldNote.data)) {
+      console.log('notify: skip (Inhalt unverändert)');
+      return new Response('skip unchanged', { status: 200 });
+    }
+
     const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     // Empfänger = Mitglieder + Besitzer, ohne den Verursacher.
