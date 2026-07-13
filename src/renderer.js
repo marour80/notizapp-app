@@ -75,6 +75,10 @@ function notifyShared(info) {
 // ---- Init ----
 (async function init() {
   data = await NZStore.load();
+  // Altlasten: früher erzeugte leere Notizen einmalig wegräumen.
+  const beforeSweep = data.notes.length;
+  data.notes = data.notes.filter((n) => !isEmptyNote(n));
+  if (data.notes.length !== beforeSweep) persist();
   const ver = (window.NZ_CONFIG && NZ_CONFIG.VERSION) || '';
   if (ver) $('appVersion').textContent = 'v' + ver;
   applyLanguage(); // setzt statische Texte + Toggle-Label
@@ -447,6 +451,8 @@ function openNote(id) {
   const note = data.notes.find((n) => n.id === id);
   if (!note) return;
   closeAllSwipes();
+  // Wechsel von einer leeren Notiz weg → die leere verwerfen.
+  if (activeNoteId && activeNoteId !== id) discardIfEmpty(activeNoteId);
   activeNoteId = id;
   doneGroupOpen = false; // erledigte Teilaufgaben starten zugeklappt
   document.body.classList.add('editor-open'); // Handy: Editor-Ebene einblenden
@@ -484,13 +490,32 @@ function scheduleSave() {
   }, 400);
 }
 
+// Ist die Notiz komplett leer? (Dann soll sie gar nicht erst bestehen bleiben.)
+function isEmptyNote(n) {
+  if (!n) return false;
+  if (n.share && n.share.code) return false; // geteilte Notizen nie automatisch löschen
+  return !(n.title || '').trim() && !(n.body || '').trim() && !(n.subtasks || []).length && !n.when;
+}
+
+// Leere Notiz beim Verlassen verwerfen (Plus gedrückt, nichts eingegeben, zurück).
+function discardIfEmpty(noteId) {
+  const n = data.notes.find((x) => x.id === noteId);
+  if (!n || !isEmptyNote(n)) return false;
+  data.notes = data.notes.filter((x) => x.id !== noteId);
+  if (activeNoteId === noteId) activeNoteId = null;
+  persist();
+  return true;
+}
+
 // Editor schließen und zurück zur Liste (wichtig fürs Handy: schließt das Overlay).
 function closeEditor() {
+  const wasActive = activeNoteId;
   activeNoteId = null;
   leavePresence();
   editorEl.classList.add('hidden');
   editorEmptyEl.classList.remove('hidden');
   document.body.classList.remove('editor-open');
+  if (wasActive && discardIfEmpty(wasActive)) renderAll();
 }
 
 function deleteNote() {
@@ -2285,7 +2310,14 @@ if ($('searchInput')) $('searchInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } // Enter schließt die Tastatur
 });
 $('scrim').onclick = () => setNav(false);
-$('backBtn').onclick = () => document.body.classList.remove('editor-open');
+$('backBtn').onclick = () => {
+  document.body.classList.remove('editor-open');
+  // Plus gedrückt, nichts eingegeben, zurück → leere Notiz gar nicht erst behalten.
+  if (activeNoteId && discardIfEmpty(activeNoteId)) {
+    closeEditor();
+    renderAll();
+  }
+};
 
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
