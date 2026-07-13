@@ -82,6 +82,49 @@ Deno.serve(async (req) => {
   try {
     const payload = await req.json();
 
+    // ---- Wartung: {mode:'list-tokens'} → Übersicht (Token nur als Präfix) ----
+    if (payload && payload.mode === 'list-tokens') {
+      const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const { data: rows } = await supa.from('push_tokens').select('device, token, platform, updated_at').order('updated_at', { ascending: false });
+      const out = (rows || []).map((r: any) => ({ device: r.device, platform: r.platform, tokenPrefix: String(r.token).slice(0, 12), updated_at: r.updated_at }));
+      return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // ---- Wartung: {mode:'move-token', from, to} → Token-Zeile auf andere Geräte-ID umziehen ----
+    if (payload && payload.mode === 'move-token') {
+      const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const { data: rows } = await supa.from('push_tokens').select('device, token, platform').eq('device', payload.from);
+      const row = rows && rows[0];
+      if (!row) return new Response(JSON.stringify({ error: 'Quelle nicht gefunden' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+      await supa.from('push_tokens').upsert({ device: payload.to, token: row.token, platform: row.platform });
+      await supa.from('push_tokens').delete().eq('device', payload.from);
+      console.log('notify: move-token ' + payload.from + ' → ' + payload.to);
+      return new Response(JSON.stringify({ moved: payload.to }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // ---- Wartung: {mode:'cleanup-tokens'} → gleicher Token unter mehreren Geräte-IDs? Nur den neuesten behalten. ----
+    if (payload && payload.mode === 'cleanup-tokens') {
+      const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const { data: rows } = await supa.from('push_tokens').select('device, token, updated_at');
+      const byToken = new Map<string, any[]>();
+      for (const r of rows || []) {
+        const list = byToken.get(r.token) || [];
+        list.push(r);
+        byToken.set(r.token, list);
+      }
+      const removed: string[] = [];
+      for (const [, list] of byToken) {
+        if (list.length < 2) continue;
+        list.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+        for (const dead of list.slice(1)) {
+          await supa.from('push_tokens').delete().eq('device', dead.device);
+          removed.push(dead.device);
+        }
+      }
+      console.log('notify: cleanup-tokens entfernt=' + JSON.stringify(removed));
+      return new Response(JSON.stringify({ removed }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
     // ---- Debug/Test-Modus: {mode:'push-test', device:'<uuid>'} → Push direkt an dieses Gerät ----
     if (payload && payload.mode === 'push-test') {
       const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -107,7 +150,11 @@ Deno.serve(async (req) => {
     const actorCand = subs
       .filter((s) => s && s.updatedBy && s.updatedBy.id === actor)
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    const who: string = (actorCand[0] && actorCand[0].updatedBy && actorCand[0].updatedBy.nickname) || 'Jemand';
+    // Bevorzugt den vom Client mitgeschriebenen Namen (data.lastActorName, ab v1.7.0).
+    const who: string =
+      (note.data && note.data.lastActorName) ||
+      (actorCand[0] && actorCand[0].updatedBy && actorCand[0].updatedBy.nickname) ||
+      'Jemand';
     const addedSubtask = subs.length > oldSubs.length;
     const bodyText = addedSubtask
       ? `${who} hat eine Teilaufgabe zu „${title}" hinzugefügt.`
@@ -121,7 +168,14 @@ Deno.serve(async (req) => {
 
     // Die App schreibt beim Sync ALLE Notizen (auch unveränderte) → der Webhook feuert
     // dann für jede geteilte Notiz. Push nur, wenn sich der INHALT wirklich geändert hat.
-    if (oldNote && oldNote.data && JSON.stringify(note.data) === JSON.stringify(oldNote.data)) {
+    // lastActorName zählt dabei NICHT als Inhalt (wechselt bei jedem Sync-Teilnehmer).
+    const norm = (d: any) => {
+      if (!d) return '';
+      const c = { ...d };
+      delete c.lastActorName;
+      return JSON.stringify(c);
+    };
+    if (oldNote && oldNote.data && norm(note.data) === norm(oldNote.data)) {
       console.log('notify: skip (Inhalt unverändert)');
       return new Response('skip unchanged', { status: 200 });
     }

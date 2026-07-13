@@ -151,11 +151,19 @@
           else mine.push(n);
         }
 
+        // Name des Speichernden – damit die Push-Nachricht "Sarah hat …" statt "Jemand hat …" sagen kann.
+        const meName = (() => {
+          try { return (global.NZDevice && NZDevice.getProfile().nickname) || ''; } catch { return ''; }
+        })();
+
         if (mine.length) {
           const rows = mine.map((n) => {
             const row = { id: n.id, owner: uid, data: stripRuntime(n), updated_at: iso(n) };
             if (n.share && n.share.code) row.share_code = n.share.code;
-            if (pushOn()) row.last_actor = uid; // nur wenn Push/Firebase eingerichtet (Spalte existiert)
+            if (pushOn()) {
+              row.last_actor = uid; // nur wenn Push/Firebase eingerichtet (Spalte existiert)
+              if (meName) row.data.lastActorName = meName;
+            }
             return row;
           });
           const { error } = await c.from('notes').upsert(rows);
@@ -165,7 +173,10 @@
         // Fremde geteilte Notizen: nur Inhalt aktualisieren (Besitz/Code unangetastet).
         for (const n of joined) {
           const patch = { data: stripRuntime(n), updated_at: iso(n) };
-          if (pushOn()) patch.last_actor = uid;
+          if (pushOn()) {
+            patch.last_actor = uid;
+            if (meName) patch.data.lastActorName = meName;
+          }
           await c.from('notes').update(patch).eq('id', n.id);
         }
 
@@ -246,13 +257,32 @@
   }
 
   // Push-Token dieses Geräts in der Cloud speichern (für native Benachrichtigungen).
+  // Token wird lokal gemerkt, damit er nach einem Identitätswechsel (Login/Logout)
+  // unter der NEUEN uid erneut gespeichert werden kann – sonst pushen wir ins Leere.
   async function savePushToken(token, platform) {
     if (!token) return;
+    try {
+      localStorage.setItem('nz_push_token', token);
+      localStorage.setItem('nz_push_platform', platform || 'android');
+    } catch {}
     try {
       const c = await ensureClient();
       await c.from('push_tokens').upsert({ device: uid, token, platform: platform || 'android' });
     } catch (e) {
       console.warn('[Push] Token speichern fehlgeschlagen:', e.message || e);
+    }
+  }
+
+  // Nach Login/Logout: uid neu lesen und den gemerkten Push-Token unter der neuen uid ablegen.
+  async function refreshIdentity() {
+    try {
+      const c = await ensureClient();
+      const { data } = await c.auth.getUser();
+      if (data && data.user) uid = data.user.id;
+      const t = localStorage.getItem('nz_push_token');
+      if (t) await c.from('push_tokens').upsert({ device: uid, token: t, platform: localStorage.getItem('nz_push_platform') || 'android' });
+    } catch (e) {
+      console.warn('[Push] refreshIdentity fehlgeschlagen:', e.message || e);
     }
   }
 
@@ -306,6 +336,7 @@
     try {
       localStorage.setItem('nz_last_email', email.trim());
     } catch {}
+    await refreshIdentity(); // uid + Push-Token auf die neue Identität umziehen
     return true; // Aufrufer lädt die App neu (uid hat gewechselt)
   }
 
@@ -324,6 +355,7 @@
     } catch {}
     await c.auth.signOut();
     await c.auth.signInAnonymously(); // neue anonyme Identität, App läuft weiter
+    await refreshIdentity(); // uid + Push-Token auf die neue Identität umziehen
   }
 
   // ---- Anmelden mit Google / Apple (OAuth) ----
@@ -375,6 +407,7 @@
     } else {
       return false;
     }
+    await refreshIdentity(); // uid + Push-Token auf die neue Identität umziehen
     return true;
   }
 
