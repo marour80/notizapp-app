@@ -518,22 +518,48 @@ function closeEditor() {
   if (wasActive && discardIfEmpty(wasActive)) renderAll();
 }
 
+// Geteilte Notizen brauchen Sonderbehandlung beim Löschen:
+// - Besitzer: löscht für ALLE → klare Warnung.
+// - Mitglied: nur die Teilung VERLASSEN (note_members-Eintrag entfernen), sonst
+//   bringt der nächste Sync die Notiz als Zombie zurück.
+function confirmSharedDelete(note) {
+  const shared = !!(note.share && note.share.code);
+  if (!shared) return true; // nicht geteilt → keine Extra-Warnung nötig
+  const isOwner = note.ownedByMe !== false; // lokal erstellte Notizen gelten als eigene
+  return confirm(t(isOwner ? 'deleteSharedOwnerConfirm' : 'deleteSharedMemberConfirm'));
+}
+
+function removeNoteEverywhere(note) {
+  const shared = !!(note.share && note.share.code);
+  const isOwner = note.ownedByMe !== false;
+  if (shared && !isOwner && window.NZShare && NZShare.leaveNote) {
+    NZShare.leaveNote(note.id).catch(() => {}); // Mitgliedschaft in der Cloud lösen
+  }
+  data.notes = data.notes.filter((n) => n.id !== note.id);
+  persist();
+}
+
 function deleteNote() {
   const note = currentNote();
   if (!note) return;
-  if (!confirm(t('deleteNoteConfirm'))) return;
-  data.notes = data.notes.filter((n) => n.id !== note.id);
-  persist();
+  const shared = !!(note.share && note.share.code);
+  if (shared ? !confirmSharedDelete(note) : !confirm(t('deleteNoteConfirm'))) return;
+  removeNoteEverywhere(note);
   closeEditor();
   renderAll();
 }
 
-// Direkt aus der Liste löschen (per Wischen) – ohne Editor, ohne Extra-Bestätigung.
+// Direkt aus der Liste löschen (per Wischen) – geteilte Notizen fragen nach.
 function deleteNoteById(id) {
-  data.notes = data.notes.filter((n) => n.id !== id);
+  const note = data.notes.find((n) => n.id === id);
+  if (!note) return;
+  if (!confirmSharedDelete(note)) {
+    closeAllSwipes();
+    return;
+  }
+  removeNoteEverywhere(note);
   if (openSwipedCard) openSwipedCard = null;
   if (activeNoteId === id) closeEditor();
-  persist();
   renderAll();
 }
 
