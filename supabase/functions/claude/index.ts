@@ -51,18 +51,26 @@ function audioFilename(file: any): string {
 }
 
 // Sprachnachricht -> Text via OpenAI Whisper.
-async function transcribe(file: any): Promise<string> {
+async function transcribe(file: any, lang: string | null = null): Promise<string> {
   const key = Deno.env.get('OPENAI_API_KEY');
   if (!key) throw new Error('OPENAI_API_KEY fehlt (Secret in Supabase setzen).');
   // whisper-1: in diesem OpenAI-Projekt freigeschaltet und akzeptiert die gängigen Audioformate.
   // (gpt-4o-mini-transcribe wäre genauer, ist hier aber nicht freigegeben → "does not have access".)
   const models = ['whisper-1'];
   const name = audioFilename(file);
+  // Kontext-Anker gegen Whisper-Halluzinationen (kurze/leise Aufnahmen kippen sonst
+  // gern in fremdsprachige Floskeln). Der Prompt verankert Sprache + Wortschatz.
+  const bias =
+    lang === 'en'
+      ? 'Voice input for a notes app: shopping lists, tasks, appointments, or questions about my notes.'
+      : 'Sprachnotiz für eine Notiz-App: Einkaufslisten, Aufgaben, Termine oder Fragen zu meinen Notizen.';
   const errs: string[] = [];
   for (const model of models) {
     const fd = new FormData();
     fd.append('file', file, name);
     fd.append('model', model);
+    fd.append('prompt', bias);
+    fd.append('temperature', '0');
     const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + key },
@@ -75,7 +83,7 @@ async function transcribe(file: any): Promise<string> {
   throw new Error('Transkription fehlgeschlagen: ' + errs.join('  ||  '));
 }
 
-async function generate(client: any, prompt: string, isVoice = false, context: any = null, notes: any[] | null = null, now: string | null = null) {
+async function generate(client: any, prompt: string, isVoice = false, context: any = null, notes: any[] | null = null, now: string | null = null, lang: string | null = null) {
   const schema = {
     type: 'object',
     additionalProperties: false,
@@ -94,6 +102,7 @@ async function generate(client: any, prompt: string, isVoice = false, context: a
   };
   let userContent = '';
   if (now) userContent += 'JETZT (aktuelles Datum/Uhrzeit des Nutzers): ' + now + '\n';
+  if (lang) userContent += 'APP-SPRACHE des Nutzers: ' + (lang === 'en' ? 'Englisch' : 'Deutsch') + '\n';
   if (notes && notes.length) userContent += 'VORHANDENE NOTIZEN DES NUTZERS (JSON):\n' + JSON.stringify(notes) + '\n\n';
   userContent += (isVoice ? 'Gesprochene Eingabe: ' : 'Eingabe: ') + prompt;
   if (context && context.title) {
@@ -121,7 +130,11 @@ async function generate(client: any, prompt: string, isVoice = false, context: a
       'Beantworte die Frage NUR anhand der mitgelieferten VORHANDENEN NOTIZEN in "answer" – kurz, freundlich, konkret (nenne Datum/Uhrzeit/Ort, rechne Datumsangaben mit JETZT um, z. B. "morgen"). ' +
       'Trage die ids der passenden Notizen in "matchedIds" ein. Findest du nichts Passendes, sag das ehrlich in "answer" ("Dazu habe ich nichts in deinen Notizen gefunden."). ' +
       'Bei "query": KEINE Notiz erstellen – "title" leer, "items" leer. NIEMALS Notizen erfinden, die nicht in den Daten stehen.\n' +
-      'Im Zweifel zwischen "note" und "list": Werden 3+ getrennte Dinge/Aufgaben genannt → "list", sonst "note". Eine Frage (Fragewort/Fragezeichen/Klang) → IMMER "query".\n\n' +
+      'Im Zweifel zwischen "note" und "list": Werden 3+ getrennte Dinge/Aufgaben genannt → "list", sonst "note". ' +
+      'FRAGEN ERKENNEN (großzügig!): Beginnt oder klingt die Eingabe wie eine Frage – Fragewörter wie wann/was/wo/wer/wie/welche, "habe ich", "hab ich", "gibt es", "steht (irgend)was", when/what/do I have/is there – dann IMMER intent="query", auch OHNE Fragezeichen und auch bei holpriger Transkription.\n' +
+      'TRANSKRIPTIONS-WÄCHTER (WICHTIG!): Die gesprochene Eingabe stammt aus automatischer Spracherkennung und ist manchmal HALLUZINIERT – typische Artefakte: kurze fremdsprachige Floskeln ohne jeden Bezug zu Notizen/Aufgaben/Terminen (z. B. arabische Sätze wie "اشتركوا في القناة", "Untertitel im Auftrag des ZDF", "Thanks for watching", reine Danksagungen oder Musik-Beschreibungen). ' +
+      'Wenn die Eingabe so ein Artefakt ist oder schlicht keinen verwertbaren Inhalt hat: intent="query", "answer" = eine kurze Bitte um Wiederholung in der APP-SPRACHE (z. B. "Das habe ich leider nicht verstanden – versuch es bitte nochmal."), alles andere leer. NIEMALS aus so einem Artefakt eine Notiz oder Liste bauen.\n' +
+      'ANTWORT-SPRACHE bei "query": dieselbe Sprache wie die Frage; bei unverständlicher Eingabe die APP-SPRACHE.\n\n' +
       'FÜR intent="list" gilt: Wandle die Eingabe in eine übersichtliche Liste um: einen kurzen Titel und passende Teilaufgaben (3–25 knappe Punkte, ohne Nummerierung).\n' +
       'SPRACHE (WICHTIG): Antworte durchgehend in EINER einzigen Sprache – derselben, in der die eigentlichen Inhalte/Aufgaben des Nutzers stehen. Titel, Teilaufgaben UND die Zusammenfassung MÜSSEN in GENAU dieser Sprache sein, niemals teils Deutsch und teils eine andere Sprache. ' +
       'Falls die Eingabe am Anfang ein einzelnes fremdsprachiges oder unsinniges Bruchstück enthält (typischer Transkriptionsfehler), IGNORIERE es und richte dich nach der Sprache des eigentlichen Inhalts.\n' +
@@ -194,7 +207,8 @@ Deno.serve(async (req) => {
       const file = form.get('file');
       if (!file) return json({ error: 'Keine Audiodatei empfangen.' }, 400);
       console.log('[Claude] Audio empfangen:', (file as any).name, '|', (file as any).type, '|', ((file as any).size ?? '?') + ' bytes');
-      const transcript = await transcribe(file);
+      const langField = form.get('lang') ? String(form.get('lang')) : null;
+      const transcript = await transcribe(file, langField);
       console.log('[Claude] Transkript (' + transcript.length + ' Zeichen):', transcript.slice(0, 160));
       if (!transcript.trim()) return json({ error: 'Nichts verstanden – bitte nochmal aufnehmen.' }, 400);
       let context: any = null;
@@ -208,15 +222,15 @@ Deno.serve(async (req) => {
         if (nRaw) notes = JSON.parse(String(nRaw));
       } catch {}
       const now = form.get('now') ? String(form.get('now')) : null;
-      const list = await generate(client, transcript, true, context, notes, now);
+      const list = await generate(client, transcript, true, context, notes, now, langField);
       return json({ ...list, transcript });
     }
 
     const { mode, input } = await req.json();
     if (mode === 'generate') {
-      // input: entweder purer Text (Altclient) oder { text, notes, now }
+      // input: entweder purer Text (Altclient) oder { text, notes, now, lang }
       if (input && typeof input === 'object') {
-        return json(await generate(client, String(input.text || ''), false, null, input.notes || null, input.now || null));
+        return json(await generate(client, String(input.text || ''), false, null, input.notes || null, input.now || null, input.lang || null));
       }
       return json(await generate(client, String(input || '')));
     }

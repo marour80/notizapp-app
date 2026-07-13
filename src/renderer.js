@@ -1835,6 +1835,7 @@ async function processVoice(blob) {
     fd.append('file', blob, 'audio.' + ext);
     fd.append('notes', JSON.stringify(notesDigest()));
     fd.append('now', new Date().toString());
+    fd.append('lang', (window.NZI18N && NZI18N.lang) || 'de');
     if (voiceDraft) {
       fd.append(
         'context',
