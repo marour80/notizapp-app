@@ -984,6 +984,66 @@ input, textarea, [contenteditable], .body-input, .preview {
   left: 4px;
 }
 .voice-share-line { margin-top: 10px; font-size: 12.5px; color: var(--accent); font-weight: 600; }
+
+/* Einfache Notiz in der Sprach-Vorschau */
+.voice-preview-body { font-size: 14px; color: var(--text-dim); line-height: 1.5; margin-bottom: 8px; white-space: pre-wrap; }
+.voice-when-line { font-size: 13px; color: var(--accent); font-weight: 600; margin-bottom: 4px; }
+
+/* Frage-Modus: Antwort der KI */
+.voice-answer-icon { font-size: 34px; text-align: center; margin: 6px 0 10px; }
+.voice-answer-text {
+  font-size: 16px;
+  color: var(--text);
+  text-align: center;
+  line-height: 1.55;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.voice-answer-notes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
+.voice-answer-notes:empty { margin-bottom: 0; }
+
+/* Termin-Badge auf der Notiz-Karte */
+.card-when { font-size: 12.5px; color: var(--accent); font-weight: 600; margin-bottom: 4px; }
+
+/* Editor: Textfeld + Termin-Zeile für einfache Notizen */
+.body-input {
+  width: 100%;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 1.55;
+  padding: 12px 14px;
+  margin: 10px 0 4px;
+  resize: vertical;
+  min-height: 90px;
+}
+.body-input:focus { outline: none; border-color: var(--accent); }
+.body-input::placeholder { color: var(--text-faint); }
+.when-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: var(--accent);
+  font-weight: 600;
+}
+.when-clear {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+}
+.when-clear:hover { color: var(--danger, #ff5c72); }
+
 .voice-confirm-btn { background: var(--ok, #3ad17a); }
 .voice-confirm-btn:hover { filter: brightness(1.08); }
 .voice-adjust-btn {

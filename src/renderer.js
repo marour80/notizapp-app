@@ -238,6 +238,7 @@ function renderNoteList() {
     const shareHtml = n.share && n.share.code ? '<span class="card-share">🔗</span>' : '';
     const snippet = escapeHtml(stripMd(n.body || ''));
     const catLabel = n.folder ? escapeHtml(n.folder) : statusLabel(status);
+    const whenHtml = n.when ? `<div class="card-when">📅 ${escapeHtml(formatWhen(n.when))}</div>` : '';
     const bodyHtml = subs.length
       ? `<div class="card-progress">
            <div class="prog-row">
@@ -246,7 +247,7 @@ function renderNoteList() {
            </div>
            <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
          </div>`
-      : `<div class="snippet">${snippet || t('noContent')}</div>`;
+      : `${whenHtml}<div class="snippet">${snippet || t('noContent')}</div>`;
     li.innerHTML = `
       <button class="card-pin" aria-label="${t(n.pinned ? 'unpin' : 'pin')}" title="${t(n.pinned ? 'unpin' : 'pin')}">📌</button>
       <button class="card-delete" aria-label="${t('delete')}" title="${t('delete')}">🗑</button>
@@ -471,6 +472,7 @@ function scheduleSave() {
   if (!note) return;
   note.title = titleInput.value;
   note.folder = folderSelect.value;
+  if (!$('bodyInput').classList.contains('hidden')) note.body = $('bodyInput').value;
   note.updatedAt = Date.now();
   $('savedHint').textContent = t('saving');
   clearTimeout(saveTimer);
@@ -670,10 +672,33 @@ function buildSubItem(st, note, noteShared) {
   return li;
 }
 
+// Einfache Notiz (ohne Teilaufgaben): Textfeld + Termin-Zeile im Editor pflegen.
+function updateSimpleNoteUI(note) {
+  const bodyEl = $('bodyInput');
+  const whenRow = $('whenRow');
+  if (!note) {
+    bodyEl.classList.add('hidden');
+    whenRow.classList.add('hidden');
+    return;
+  }
+  const liveSubs = (note.subtasks || []).filter((s) => !s.deleted);
+  // Textfeld zeigen, wenn die Notiz Text hat ODER (noch) keine Teilaufgaben.
+  const showBody = !!(note.body || liveSubs.length === 0);
+  bodyEl.classList.toggle('hidden', !showBody);
+  if (bodyEl.value !== (note.body || '')) bodyEl.value = note.body || '';
+  if (note.when) {
+    $('whenLabel').textContent = '📅 ' + formatWhen(note.when);
+    whenRow.classList.remove('hidden');
+  } else {
+    whenRow.classList.add('hidden');
+  }
+}
+
 function renderSubtasks() {
   const note = currentNote();
   const listEl = $('subList');
   listEl.innerHTML = '';
+  updateSimpleNoteUI(note);
   if (!note) return;
   if (!note.subtasks) note.subtasks = [];
 
@@ -1675,6 +1700,7 @@ async function beginRecording() {
   $('voiceError').classList.add('hidden');
   $('voiceProcessing').classList.add('hidden');
   $('voiceConfirm').classList.add('hidden');
+  $('voiceAnswer').classList.add('hidden');
   $('voiceRecording').classList.remove('hidden');
   $('voiceTimer').textContent = '0:00';
   $('voiceModal').classList.remove('hidden');
@@ -1767,36 +1793,103 @@ function closeVoice() {
     } catch {}
   }
   voiceDraft = null;
+  try { window.speechSynthesis && speechSynthesis.cancel(); } catch {}
+  $('voiceAnswer').classList.add('hidden');
   $('voiceModal').classList.add('hidden');
+}
+
+// Kompakte Übersicht aller Notizen für die KI (Fragen beantworten, Termine finden).
+function notesDigest() {
+  return (data.notes || []).slice(0, 150).map((n) => ({
+    id: n.id,
+    title: n.title || '',
+    when: n.when || null,
+    body: (n.body || '').slice(0, 300),
+    items: (n.subtasks || [])
+      .filter((s) => !s.deleted)
+      .slice(0, 40)
+      .map((s) => s.text + ((s.status || 'todo') === 'done' ? ' ✓' : ''))
+  }));
+}
+
+// Antwort laut vorlesen (Sprachantwort) – eingebaute System-Stimme, kein Netz nötig.
+function speak(text) {
+  try {
+    if (!text || !window.speechSynthesis) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = (window.NZI18N && NZI18N.lang === 'en') ? 'en-US' : 'de-DE';
+    speechSynthesis.speak(u);
+  } catch {}
 }
 
 async function processVoice(blob) {
   $('voiceRecording').classList.add('hidden');
   $('voiceConfirm').classList.add('hidden');
+  $('voiceAnswer').classList.add('hidden');
   $('voiceProcessing').classList.remove('hidden');
   try {
     const tp = blob.type || '';
     const ext = /m4a|aac/.test(tp) ? 'm4a' : /mp4|mpeg/.test(tp) ? 'mp4' : /ogg/.test(tp) ? 'ogg' : /wav/.test(tp) ? 'wav' : 'webm';
     const fd = new FormData();
     fd.append('file', blob, 'audio.' + ext);
+    fd.append('notes', JSON.stringify(notesDigest()));
+    fd.append('now', new Date().toString());
     if (voiceDraft) {
       fd.append(
         'context',
-        JSON.stringify({ title: voiceDraft.title, items: voiceDraft.items, shareWith: voiceDraft.shareWith })
+        JSON.stringify({
+          intent: voiceDraft.intent,
+          title: voiceDraft.title,
+          items: voiceDraft.items,
+          body: voiceDraft.body,
+          when: voiceDraft.when,
+          shareWith: voiceDraft.shareWith
+        })
       );
     }
     const res = await NZAI.voice(fd);
     voiceDraft = {
+      intent: res.intent || 'list',
       title: res.title || '',
       items: res.items || [],
+      body: res.body || '',
+      when: res.when || '',
+      answer: res.answer || '',
+      matchedIds: res.matchedIds || [],
       shareWith: (res.shareWith || '').trim(),
       summary: res.summary || ''
     };
-    showVoiceConfirm(voiceDraft);
+    if (voiceDraft.intent === 'query') showVoiceAnswer(voiceDraft);
+    else showVoiceConfirm(voiceDraft);
   } catch (e) {
     $('voiceProcessing').classList.add('hidden');
     showVoiceError(t('errGeneric') + (e.message || e));
   }
+}
+
+// Frage-Modus: Antwort anzeigen (+ vorlesen) statt eine Notiz zu erstellen.
+function showVoiceAnswer(draft) {
+  $('voiceProcessing').classList.add('hidden');
+  $('voiceRecording').classList.add('hidden');
+  $('voiceConfirm').classList.add('hidden');
+  $('voiceAnswerText').textContent = draft.answer || t('queryNoAnswer');
+  const chips = $('voiceAnswerNotes');
+  chips.innerHTML = '';
+  (draft.matchedIds || []).forEach((id) => {
+    const n = data.notes.find((x) => x.id === id);
+    if (!n) return;
+    const b = document.createElement('button');
+    b.className = 'friend-chip';
+    b.textContent = '📄 ' + (n.title || t('untitled'));
+    b.onclick = () => {
+      closeVoice();
+      openNote(n.id);
+    };
+    chips.appendChild(b);
+  });
+  $('voiceAnswer').classList.remove('hidden');
+  speak(draft.answer);
 }
 
 // Zeigt, was die KI verstanden hat → der Nutzer bestätigt oder bessert nach.
@@ -1805,7 +1898,22 @@ function showVoiceConfirm(draft) {
   $('voiceRecording').classList.add('hidden');
   $('voiceSummary').textContent = draft.summary || '';
   $('voicePreviewTitle').textContent = draft.title || t('newList');
-  $('voicePreviewItems').innerHTML = (draft.items || []).map((it) => `<li>${escapeHtml(it)}</li>`).join('');
+  const isNote = draft.intent === 'note';
+  $('voicePreviewItems').innerHTML = isNote ? '' : (draft.items || []).map((it) => `<li>${escapeHtml(it)}</li>`).join('');
+  const bodyEl = $('voicePreviewBody');
+  if (isNote && draft.body) {
+    bodyEl.textContent = draft.body;
+    bodyEl.classList.remove('hidden');
+  } else {
+    bodyEl.classList.add('hidden');
+  }
+  const whenEl = $('voicePreviewWhen');
+  if (isNote && draft.when) {
+    whenEl.textContent = '📅 ' + formatWhen(draft.when);
+    whenEl.classList.remove('hidden');
+  } else {
+    whenEl.classList.add('hidden');
+  }
   const shareEl = $('voicePreviewShare');
   if (draft.shareWith) {
     shareEl.textContent = '🔗 ' + t('voiceShareLine', { who: draft.shareWith });
@@ -1816,11 +1924,43 @@ function showVoiceConfirm(draft) {
   $('voiceConfirm').classList.remove('hidden');
 }
 
+// "2026-07-15T20:00" → "Mi., 15. Juli, 20:00" (bzw. nur Datum ohne Uhrzeit).
+function formatWhen(when) {
+  if (!when) return '';
+  try {
+    const hasTime = when.includes('T');
+    const d = new Date(hasTime ? when : when + 'T12:00');
+    if (isNaN(d.getTime())) return when;
+    const loc = (window.NZI18N && NZI18N.lang === 'en') ? 'en-US' : 'de-DE';
+    const date = d.toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'long' });
+    if (!hasTime) return date;
+    return date + ', ' + d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return when;
+  }
+}
+
+// Einfache Notiz (ohne Teilaufgaben) aus der KI-Antwort erstellen.
+function createSimpleNoteFromAI(title, body, when) {
+  const note = NZ.makeNote({
+    title: title || t('untitled'),
+    body: body || '',
+    folder: currentFolder === '__all__' ? '' : currentFolder
+  });
+  if (when) note.when = when;
+  data.notes.unshift(note);
+  persist();
+  renderAll();
+  openNote(note.id);
+}
+
 function confirmVoice() {
   const draft = voiceDraft;
   if (!draft) return;
   $('voiceModal').classList.add('hidden');
-  if (voiceTargetId && data.notes.find((n) => n.id === voiceTargetId)) {
+  if (draft.intent === 'note') {
+    createSimpleNoteFromAI(draft.title, draft.body, draft.when);
+  } else if (voiceTargetId && data.notes.find((n) => n.id === voiceTargetId)) {
     fillNoteFromVoice(voiceTargetId, draft.title, draft.items);
   } else {
     createNoteFromAI(draft.title, draft.items);
@@ -1840,6 +1980,11 @@ $('voiceStop').onclick = stopVoice;
 $('voiceConfirmBtn').onclick = confirmVoice;
 $('voiceAdjustBtn').onclick = adjustVoice;
 $('voiceClose').onclick = closeVoice;
+$('voiceAnswerOk').onclick = closeVoice;
+$('voiceAnswerAgain').onclick = () => {
+  voiceDraft = null; // neue Frage, kein Anpassungs-Kontext
+  beginRecording();
+};
 $('sortBtn').onclick = aiSort;
 $('newFolderBtn').onclick = newFolder;
 $('deleteBtn').onclick = deleteNote;
@@ -1859,6 +2004,14 @@ if ($('langToggle')) $('langToggle').onclick = toggleLanguage;
 
 titleInput.oninput = scheduleSave;
 folderSelect.onchange = scheduleSave;
+$('bodyInput').oninput = scheduleSave;
+$('whenClear').onclick = () => {
+  const note = currentNote();
+  if (!note) return;
+  note.when = null;
+  $('whenRow').classList.add('hidden');
+  scheduleSave();
+};
 
 $('searchInput').oninput = (e) => {
   searchTerm = e.target.value;

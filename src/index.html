@@ -160,6 +160,13 @@
           <select id="folderSelect" class="folder-select"></select>
         </div>
 
+        <div id="whenRow" class="when-row hidden">
+          <span id="whenLabel">📅</span>
+          <button id="whenClear" class="when-clear" data-i18n-title="whenClear" title="Termin entfernen">✕</button>
+        </div>
+
+        <textarea id="bodyInput" class="body-input hidden" data-i18n-ph="bodyPlaceholder" placeholder="Notiz-Text…" rows="4"></textarea>
+
         <div class="subtasks">
           <div class="subtasks-head">
             <span><span data-i18n="subtasks">Teilaufgaben</span> <span id="subProgress" class="sub-progress"></span></span>
@@ -381,11 +388,20 @@
         <p class="voice-summary" id="voiceSummary"></p>
         <div class="voice-preview">
           <h3 id="voicePreviewTitle"></h3>
+          <p id="voicePreviewBody" class="voice-preview-body hidden"></p>
+          <div id="voicePreviewWhen" class="voice-when-line hidden"></div>
           <ul id="voicePreviewItems"></ul>
           <div id="voicePreviewShare" class="voice-share-line hidden"></div>
         </div>
         <button id="voiceConfirmBtn" class="primary-btn voice-confirm-btn" data-i18n="voiceConfirm">✓ Passt – erstellen</button>
         <button id="voiceAdjustBtn" class="voice-adjust-btn" data-i18n="voiceAdjust">🎤 Anpassen</button>
+      </div>
+      <div id="voiceAnswer" class="hidden">
+        <div class="voice-answer-icon">💡</div>
+        <p id="voiceAnswerText" class="voice-answer-text"></p>
+        <div id="voiceAnswerNotes" class="voice-answer-notes"></div>
+        <button id="voiceAnswerAgain" class="voice-adjust-btn" data-i18n="voiceAskMore">🎤 Weiter fragen</button>
+        <button id="voiceAnswerOk" class="primary-btn" data-i18n="ok">OK</button>
       </div>
       <div id="voiceError" class="join-error hidden"></div>
     </div>

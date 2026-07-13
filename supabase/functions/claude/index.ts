@@ -75,36 +75,57 @@ async function transcribe(file: any): Promise<string> {
   throw new Error('Transkription fehlgeschlagen: ' + errs.join('  ||  '));
 }
 
-async function generate(client: any, prompt: string, isVoice = false, context: any = null) {
+async function generate(client: any, prompt: string, isVoice = false, context: any = null, notes: any[] | null = null, now: string | null = null) {
   const schema = {
     type: 'object',
     additionalProperties: false,
     properties: {
+      intent: { type: 'string', enum: ['list', 'note', 'query'] },
       title: { type: 'string' },
       items: { type: 'array', items: { type: 'string' } },
+      body: { type: 'string' },
+      when: { type: 'string' },
+      answer: { type: 'string' },
+      matchedIds: { type: 'array', items: { type: 'string' } },
       shareWith: { type: 'string' },
       summary: { type: 'string' }
     },
-    required: ['title', 'items', 'summary']
+    required: ['intent', 'title', 'items', 'body', 'when', 'answer', 'matchedIds', 'shareWith', 'summary']
   };
-  let userContent = (isVoice ? 'Gesprochene Notiz: ' : '') + prompt;
+  let userContent = '';
+  if (now) userContent += 'JETZT (aktuelles Datum/Uhrzeit des Nutzers): ' + now + '\n';
+  if (notes && notes.length) userContent += 'VORHANDENE NOTIZEN DES NUTZERS (JSON):\n' + JSON.stringify(notes) + '\n\n';
+  userContent += (isVoice ? 'Gesprochene Eingabe: ' : 'Eingabe: ') + prompt;
   if (context && context.title) {
     userContent =
-      'AKTUELLE LISTE (vom Nutzer noch NICHT bestätigt):\n' +
+      (now ? 'JETZT: ' + now + '\n' : '') +
+      'AKTUELLER ENTWURF (vom Nutzer noch NICHT bestätigt, intent=' + (context.intent || 'list') + '):\n' +
       'Titel: ' + context.title + '\n' +
+      (context.body ? 'Text: ' + context.body + '\n' : '') +
+      (context.when ? 'Termin: ' + context.when + '\n' : '') +
       'Punkte: ' + ((context.items || []).join(', ') || '(keine)') + '\n' +
       (context.shareWith ? 'Teilen mit: ' + context.shareWith + '\n' : '') +
-      '\nDer Nutzer möchte diese Liste ANPASSEN. Seine Korrektur (gesprochen): "' + prompt + '"\n' +
-      'Gib die VOLLSTÄNDIGE aktualisierte Liste zurück (nicht nur die Änderung) + eine kurze Zusammenfassung der Änderung.';
+      '\nDer Nutzer möchte diesen Entwurf ANPASSEN. Seine Korrektur (gesprochen): "' + prompt + '"\n' +
+      'Gib den VOLLSTÄNDIGEN aktualisierten Entwurf zurück (nicht nur die Änderung) + eine kurze Zusammenfassung der Änderung. Behalte den intent bei, außer die Korrektur verlangt klar etwas anderes.';
   }
   const res = await client.messages.create({
     model: MODEL_GENERATE,
-    max_tokens: 1024,
+    max_tokens: 3000,
     system:
-      'Du wandelst die Eingabe in eine übersichtliche Liste um: einen kurzen Titel und passende Teilaufgaben (3–25 knappe Punkte, ohne Nummerierung).\n' +
+      'Du bist der Assistent einer Notiz-App. Entscheide zuerst die ABSICHT ("intent") der Eingabe:\n' +
+      '• "list" – der Nutzer will eine Liste/Aufgaben anlegen (Einkauf, Packliste, Rezept, To-dos, Vorhaben mit mehreren Schritten).\n' +
+      '• "note" – der Nutzer will EINE einfache Notiz/Info/Termin festhalten, OHNE Teilaufgaben (z. B. "Padel am Montag um 16 Uhr in der Halle mit Marvin", "WLAN-Passwort ist …", "Reifen wechseln nicht vergessen"). ' +
+      'Fülle dann: "title" = kurzer prägnanter Titel, "body" = die vollständige Info in 1–3 Sätzen, "items" = LEER. ' +
+      '"when": Wird ein Datum/eine Uhrzeit genannt, rechne sie mithilfe von JETZT in ein absolutes Datum um und gib es als ISO-String zurück (z. B. "2026-07-15T20:00"); ohne Uhrzeit nur das Datum ("2026-07-15"); ohne Zeitangabe leer lassen.\n' +
+      '• "query" – der Nutzer FRAGT etwas über seine vorhandenen Notizen ("Wann ist mein nächstes Padel-Spiel?", "Habe ich am Mittwoch was vor?", "Was steht auf der Einkaufsliste?"). ' +
+      'Beantworte die Frage NUR anhand der mitgelieferten VORHANDENEN NOTIZEN in "answer" – kurz, freundlich, konkret (nenne Datum/Uhrzeit/Ort, rechne Datumsangaben mit JETZT um, z. B. "morgen"). ' +
+      'Trage die ids der passenden Notizen in "matchedIds" ein. Findest du nichts Passendes, sag das ehrlich in "answer" ("Dazu habe ich nichts in deinen Notizen gefunden."). ' +
+      'Bei "query": KEINE Notiz erstellen – "title" leer, "items" leer. NIEMALS Notizen erfinden, die nicht in den Daten stehen.\n' +
+      'Im Zweifel zwischen "note" und "list": Werden 3+ getrennte Dinge/Aufgaben genannt → "list", sonst "note". Eine Frage (Fragewort/Fragezeichen/Klang) → IMMER "query".\n\n' +
+      'FÜR intent="list" gilt: Wandle die Eingabe in eine übersichtliche Liste um: einen kurzen Titel und passende Teilaufgaben (3–25 knappe Punkte, ohne Nummerierung).\n' +
       'SPRACHE (WICHTIG): Antworte durchgehend in EINER einzigen Sprache – derselben, in der die eigentlichen Inhalte/Aufgaben des Nutzers stehen. Titel, Teilaufgaben UND die Zusammenfassung MÜSSEN in GENAU dieser Sprache sein, niemals teils Deutsch und teils eine andere Sprache. ' +
       'Falls die Eingabe am Anfang ein einzelnes fremdsprachiges oder unsinniges Bruchstück enthält (typischer Transkriptionsfehler), IGNORIERE es und richte dich nach der Sprache des eigentlichen Inhalts.\n' +
-      'ZUSAMMENFASSUNG ("summary"): Schreib in 1 kurzen, freundlichen Satz (in der Sprache des Nutzers), WAS du verstanden hast und gleich tust — z. B. "Ich erstelle die Liste „Wocheneinkauf" mit Milch, Brot und Eiern und teile sie mit Mama." Diese Zusammenfassung wird dem Nutzer zur Bestätigung gezeigt.\n' +
+      'ZUSAMMENFASSUNG ("summary"): Schreib in 1 kurzen, freundlichen Satz (in der Sprache des Nutzers), WAS du verstanden hast und gleich tust — z. B. "Ich erstelle die Liste „Wocheneinkauf" mit Milch, Brot und Eiern und teile sie mit Mama." oder bei einer einfachen Notiz "Ich notiere: Padel am Mittwoch um 20 Uhr mit Patrick." Bei intent="query" lass "summary" leer. Diese Zusammenfassung wird dem Nutzer zur Bestätigung gezeigt.\n' +
       'TEILEN (SEHR VORSICHTIG!): Setze "shareWith" NUR dann, wenn die Eingabe ein EINDEUTIGES Teilen-Kommando enthält – also ein Teilen-Verb ' +
       '(teilen/teile, schicken/schick, senden, share, send, شارك, أرسل) ZUSAMMEN mit "mit/an/with/to/مع/إلى" und einem Namen, ' +
       'z. B. "…und teile das mit Mama", "share this with Anna", "schick das an Papa". ' +
@@ -181,12 +202,24 @@ Deno.serve(async (req) => {
         const ctxRaw = form.get('context');
         if (ctxRaw) context = JSON.parse(String(ctxRaw));
       } catch {}
-      const list = await generate(client, transcript, true, context);
+      let notes: any[] | null = null;
+      try {
+        const nRaw = form.get('notes');
+        if (nRaw) notes = JSON.parse(String(nRaw));
+      } catch {}
+      const now = form.get('now') ? String(form.get('now')) : null;
+      const list = await generate(client, transcript, true, context, notes, now);
       return json({ ...list, transcript });
     }
 
     const { mode, input } = await req.json();
-    if (mode === 'generate') return json(await generate(client, String(input || '')));
+    if (mode === 'generate') {
+      // input: entweder purer Text (Altclient) oder { text, notes, now }
+      if (input && typeof input === 'object') {
+        return json(await generate(client, String(input.text || ''), false, null, input.notes || null, input.now || null));
+      }
+      return json(await generate(client, String(input || '')));
+    }
     if (mode === 'sort') return json(await sortItems(client, (input && input.items) || []));
     return json({ error: 'Unbekannter Modus' }, 400);
   } catch (e) {
