@@ -375,7 +375,10 @@
       <button class="modal-close" id="voiceClose">✕</button>
       <h2 data-i18n="voiceNoteModal">🎤 Sprachnotiz</h2>
       <div id="voiceRecording">
-        <div class="voice-pulse">🎙️</div>
+        <div class="voice-orb-wrap">
+          <canvas id="voiceOrb" class="voice-orb" width="400" height="400"></canvas>
+          <div class="voice-pulse hidden" id="voicePulse">🎙️</div>
+        </div>
         <p class="modal-hint" data-i18n="voiceRecHint">Sprich deine Liste ein – z. B. „Ich muss Milch, Brot und Eier kaufen und den Müll rausbringen."</p>
         <p class="voice-timer" id="voiceTimer">0:00</p>
         <button id="voiceStop" class="primary-btn" data-i18n="voiceDone">⏹ Fertig</button>

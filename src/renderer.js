@@ -1813,6 +1813,7 @@ function micSupported() {
   return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
 }
 function showVoiceError(msg) {
+  stopVoiceOrb();
   $('voiceError').textContent = msg;
   $('voiceError').classList.remove('hidden');
 }
@@ -1826,6 +1827,130 @@ async function startVoice(targetId) {
 function adjustVoice() {
   // Nachbessern: erneut aufnehmen, aber den aktuellen Entwurf als Kontext behalten.
   beginRecording();
+}
+
+// ---- Voice-Orb: pulsierende Kugel während der Aufnahme (à la ChatGPT-Voice) ----
+// Reagiert auf die echte Mikrofon-Lautstärke (Web/Android via AnalyserNode).
+// Auf iOS läuft die Aufnahme nativ (kein Web-Audio-Pegel) → lebendige Sprech-Simulation.
+let voiceOrb = null; // { raf, gl, actx }
+
+function startVoiceOrb(stream) {
+  stopVoiceOrb();
+  const canvas = $('voiceOrb');
+  const fallback = $('voicePulse');
+  if (!canvas) return;
+  let gl = null;
+  try { gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false }); } catch {}
+  if (!gl) {
+    canvas.classList.add('hidden');
+    if (fallback) fallback.classList.remove('hidden');
+    return;
+  }
+  canvas.classList.remove('hidden');
+  if (fallback) fallback.classList.add('hidden');
+
+  const vs = 'attribute vec2 p; void main(){ gl_Position = vec4(p,0.,1.); }';
+  const fs =
+    'precision highp float;\n' +
+    'uniform float u_time; uniform float u_level; uniform vec2 u_res;\n' +
+    'void main(){\n' +
+    '  vec2 uv = (gl_FragCoord.xy*2.0 - u_res) / min(u_res.x,u_res.y);\n' +
+    '  float d = length(uv);\n' +
+    '  float lv = clamp(u_level, 0.0, 1.0);\n' +
+    '  float R = 0.52 + lv*0.10;\n' +                 // Kugel atmet mit der Lautstärke
+    '  float sphere = smoothstep(R, R-0.02, d);\n' +
+    '  float w1 = abs(sin(d*14.0 - u_time*5.0)) * (0.04+lv*0.10) / max(abs(d-R-0.10), 0.02);\n' +
+    '  float w2 = abs(sin(d*9.0 - u_time*2.5)) * (0.02+lv*0.06) / max(abs(d-R-0.28), 0.03);\n' +
+    '  float glow = (0.05+lv*0.10) / max(d, 0.05);\n' +
+    '  float mesh = abs(sin(uv.x*18.0 + u_time*0.6)) * abs(sin(uv.y*18.0 - u_time*0.4));\n' +
+    '  vec3 teal = vec3(0.329, 0.859, 0.784);\n' +   // App-Akzent #54dbc8
+    '  vec3 col = teal * (w1 + w2 + glow) + teal * mesh * 0.10 * sphere;\n' +
+    '  col += vec3(1.0) * sphere * (0.03 + lv*0.05);\n' +
+    '  float a = clamp(max(max(col.r, col.g), col.b), 0.0, 1.0);\n' +
+    '  gl_FragColor = vec4(col, a);\n' +
+    '}';
+  function sh(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    canvas.classList.add('hidden');
+    if (fallback) fallback.classList.remove('hidden');
+    return;
+  }
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const pLoc = gl.getAttribLocation(prog, 'p');
+  gl.enableVertexAttribArray(pLoc);
+  gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0);
+  const uTime = gl.getUniformLocation(prog, 'u_time');
+  const uLevel = gl.getUniformLocation(prog, 'u_level');
+  const uRes = gl.getUniformLocation(prog, 'u_res');
+
+  // Echt-Pegel (wenn ein Stream da ist), sonst Simulation. Bleibt ein Stream
+  // länger still (>1.5 s), wechseln wir weich in die Simulation.
+  let analyser = null;
+  let dataArr = null;
+  let actx = null;
+  if (stream && (window.AudioContext || window.webkitAudioContext)) {
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      const src = actx.createMediaStreamSource(stream);
+      analyser = actx.createAnalyser();
+      analyser.fftSize = 256;
+      src.connect(analyser);
+      dataArr = new Uint8Array(analyser.frequencyBinCount);
+    } catch {}
+  }
+  let level = 0;
+  let silentMs = 0;
+  let last = performance.now();
+  function frame(t) {
+    const dt = t - last;
+    last = t;
+    let raw = 0;
+    if (analyser) {
+      analyser.getByteTimeDomainData(dataArr);
+      let sum = 0;
+      for (let i = 0; i < dataArr.length; i++) {
+        const v = (dataArr[i] - 128) / 128;
+        sum += v * v;
+      }
+      raw = Math.min(1, Math.sqrt(sum / dataArr.length) * 4);
+    }
+    if (raw < 0.03) silentMs += dt; else silentMs = 0;
+    let target = raw;
+    if (!analyser || silentMs > 1500) {
+      // Sprech-Simulation: mehrere überlagerte Wellen wirken wie natürliche Sprachdynamik
+      target = 0.3 + 0.18 * Math.sin(t * 0.004) + 0.14 * Math.sin(t * 0.011 + 1.7) + 0.1 * Math.sin(t * 0.023 + 0.5);
+      target = Math.max(0.08, target);
+    }
+    level += (target - level) * 0.18;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.uniform1f(uTime, t * 0.001);
+    gl.uniform1f(uLevel, level);
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    voiceOrb.raf = requestAnimationFrame(frame);
+  }
+  voiceOrb = { raf: requestAnimationFrame(frame), gl, actx };
+}
+
+function stopVoiceOrb() {
+  if (!voiceOrb) return;
+  cancelAnimationFrame(voiceOrb.raf);
+  try { voiceOrb.actx && voiceOrb.actx.close(); } catch {}
+  voiceOrb = null;
 }
 
 async function beginRecording() {
@@ -1846,6 +1971,7 @@ async function beginRecording() {
       return;
     }
     nativeRecording = true;
+    startVoiceOrb(null); // nativer Recorder liefert keinen Web-Pegel → Simulation
     startVoiceTimer();
     return;
   }
@@ -1853,6 +1979,7 @@ async function beginRecording() {
   // Web/Android: MediaRecorder
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    startVoiceOrb(stream); // Orb reagiert auf die echte Lautstärke
     audioChunks = [];
     const useWebm = window.MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/webm');
     mediaRecorder = useWebm ? new MediaRecorder(stream, { mimeType: 'audio/webm' }) : new MediaRecorder(stream);
@@ -1925,6 +2052,7 @@ function closeVoice() {
     } catch {}
   }
   voiceDraft = null;
+  stopVoiceOrb();
   try { window.speechSynthesis && speechSynthesis.cancel(); } catch {}
   $('voiceAnswer').classList.add('hidden');
   $('voiceModal').classList.add('hidden');
@@ -1956,6 +2084,7 @@ function speak(text) {
 }
 
 async function processVoice(blob) {
+  stopVoiceOrb();
   $('voiceRecording').classList.add('hidden');
   $('voiceConfirm').classList.add('hidden');
   $('voiceAnswer').classList.add('hidden');
