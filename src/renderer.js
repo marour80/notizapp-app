@@ -263,7 +263,7 @@ function agendaRow(n, d) {
   return li;
 }
 
-function renderAgenda(dated) {
+function renderAgenda(dated, withHead) {
   if (!dated.length) return null;
   const wrap = document.createElement('li');
   wrap.className = 'agenda-wrap';
@@ -272,7 +272,7 @@ function renderAgenda(dated) {
   const byWhen = (a, b) => whenDate(a) - whenDate(b);
   const section = document.createElement('div');
   section.className = 'agenda';
-  section.innerHTML = `<div class="agenda-head">📅 <span>${t('agendaTitle')}</span></div>`;
+  if (withHead) section.innerHTML = `<div class="agenda-head">📅 <span>${t('agendaTitle')}</span></div>`;
   [['today', 'agendaToday'], ['tomorrow', 'agendaTomorrow'], ['week', 'agendaWeek'], ['later', 'agendaLater']].forEach(([key, label]) => {
     const arr = buckets[key].sort(byWhen);
     if (!arr.length) return;
@@ -298,19 +298,28 @@ function renderAgenda(dated) {
   return wrap;
 }
 
+// Termine-Tab: alle Notizen mit Termin (ordnerübergreifend), gruppiert wie die Agenda.
+function renderTermine() {
+  const listEl = $('termineList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  const dated = (data.notes || []).filter((n) => whenDate(n));
+  $('termineEmpty').classList.toggle('hidden', dated.length > 0);
+  const agenda = renderAgenda(dated, false);
+  if (agenda) listEl.appendChild(agenda);
+}
+
 function renderNoteList() {
   const all = filteredNotes();
-  $('noteCount').textContent = all.length;
   $('listTitle').textContent = currentFolder === '__all__' ? t('allNotes') : currentFolder;
 
   noteListEl.innerHTML = '';
-  $('emptyList').classList.toggle('hidden', all.length > 0);
 
-  // Termin-Notizen wandern in die Agenda-Sektion, der Rest bleibt als Karten.
-  const dated = all.filter((n) => whenDate(n));
+  // Termin-Notizen leben im eigenen "Termine"-Tab – hier nur die normalen Karten.
   const list = all.filter((n) => !whenDate(n));
-  const agenda = renderAgenda(dated);
-  if (agenda) noteListEl.appendChild(agenda);
+  $('emptyList').classList.toggle('hidden', list.length > 0);
+  $('noteCount').textContent = list.length;
+  renderTermine(); // Termine-Tab immer aktuell halten
 
   list.forEach((n) => {
     const status = deriveStatus(n);
@@ -2073,12 +2082,34 @@ function notesDigest() {
 }
 
 // Antwort laut vorlesen (Sprachantwort) – eingebaute System-Stimme, kein Netz nötig.
+// Wählt die beste verfügbare Stimme (Enhanced/Premium/Siri klingen deutlich natürlicher
+// als die Standard-Roboterstimme – auf iOS je nach heruntergeladenen Stimmen).
+function pickVoice(langPrefix) {
+  try {
+    const voices = speechSynthesis.getVoices() || [];
+    const mine = voices.filter((v) => (v.lang || '').toLowerCase().startsWith(langPrefix));
+    if (!mine.length) return null;
+    return (
+      mine.find((v) => /siri/i.test(v.name)) ||
+      mine.find((v) => /premium|enhanced|erweitert/i.test(v.name)) ||
+      mine.find((v) => /anna|helena|samantha|ava/i.test(v.name)) ||
+      mine[0]
+    );
+  } catch {
+    return null;
+  }
+}
+
 function speak(text) {
   try {
     if (!text || !window.speechSynthesis) return;
     speechSynthesis.cancel();
+    const en = window.NZI18N && NZI18N.lang === 'en';
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = (window.NZI18N && NZI18N.lang === 'en') ? 'en-US' : 'de-DE';
+    u.lang = en ? 'en-US' : 'de-DE';
+    const v = pickVoice(en ? 'en' : 'de');
+    if (v) u.voice = v;
+    u.rate = 1.04; // minimal flotter → klingt weniger leiernd
     speechSynthesis.speak(u);
   } catch {}
 }
@@ -2118,6 +2149,7 @@ async function processVoice(blob) {
       body: res.body || '',
       when: res.when || '',
       answer: res.answer || '',
+      spoken: res.spoken || '',
       matchedIds: res.matchedIds || [],
       shareWith: (res.shareWith || '').trim(),
       summary: res.summary || ''
@@ -2151,7 +2183,8 @@ function showVoiceAnswer(draft) {
     chips.appendChild(b);
   });
   $('voiceAnswer').classList.remove('hidden');
-  speak(draft.answer);
+  // Kurzfassung sprechen (nicht den ganzen Text) – klingt knackiger.
+  speak(draft.spoken || draft.answer);
 }
 
 // Zeigt, was die KI verstanden hat → der Nutzer bestätigt oder bessert nach.
@@ -2203,6 +2236,7 @@ function formatWhen(when) {
 }
 
 // Einfache Notiz (ohne Teilaufgaben) aus der KI-Antwort erstellen.
+// Termin-Notizen werden NUR eingefügt (nicht geöffnet) – sie landen im Termine-Tab.
 function createSimpleNoteFromAI(title, body, when) {
   const note = NZ.makeNote({
     title: title || t('untitled'),
@@ -2213,7 +2247,15 @@ function createSimpleNoteFromAI(title, body, when) {
   data.notes.unshift(note);
   persist();
   renderAll();
-  openNote(note.id);
+  if (when) {
+    // kurz den Termine-Tab zeigen, damit man sieht, wo der Termin gelandet ist
+    renderTermine();
+    document.body.classList.remove('editor-open', 'search-open');
+    document.body.classList.add('termine-open');
+    setActiveTab('termine');
+  } else {
+    openNote(note.id);
+  }
 }
 
 function confirmVoice() {
@@ -2487,9 +2529,15 @@ document.querySelectorAll('#bottomNav .bnav-item').forEach((btn) => {
   btn.onclick = () => {
     const nav = btn.dataset.nav;
     if (nav === 'notes') {
-      document.body.classList.remove('editor-open', 'search-open');
+      document.body.classList.remove('editor-open', 'search-open', 'termine-open');
       setNav(false);
       setActiveTab('notes');
+    } else if (nav === 'termine') {
+      document.body.classList.remove('editor-open', 'search-open');
+      renderTermine();
+      document.body.classList.add('termine-open');
+      setNav(false);
+      setActiveTab('termine');
     } else if (nav === 'friends') {
       const fb = $('friendsBtn');
       if (fb && !fb.classList.contains('hidden')) fb.click();

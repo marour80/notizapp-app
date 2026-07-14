@@ -1013,6 +1013,35 @@ input, textarea, [contenteditable], .body-input, .preview {
 /* Termin-Badge auf der Notiz-Karte */
 .card-when { font-size: 12.5px; color: var(--accent); font-weight: 600; margin-bottom: 4px; }
 
+/* ---- Termine-Screen (eigener Tab) ---- */
+.termine-screen {
+  position: fixed;
+  inset: 0;
+  bottom: calc(60px + env(safe-area-inset-bottom, 0px)); /* Platz für die Bottom-Nav */
+  background: var(--bg);
+  z-index: 48; /* unter Editor-Overlay (50) und Bottom-Nav */
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px 10px;
+  overflow: hidden;
+}
+body:not(.termine-open) .termine-screen { display: none; }
+.termine-screen.hidden { display: none; }
+.termine-head h2 { font-size: 20px; font-weight: 800; margin-bottom: 14px; }
+.termine-list { list-style: none; overflow-y: auto; flex: 1; padding-bottom: 20px; }
+.termine-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-faint);
+  text-align: center;
+  padding: 0 30px;
+}
+.termine-empty .te-icon { font-size: 44px; }
+
 /* ---- Agenda: Termin-Notizen als eigene Sektion ---- */
 .agenda-wrap { list-style: none; }
 .agenda { margin-bottom: 18px; }
@@ -1617,7 +1646,7 @@ input, textarea, [contenteditable], .body-input, .preview {
   }
   .bnav-item .bnav-ic { line-height: 1; opacity: 0.8; }
   .bnav-item .bnav-ic svg { width: 24px; height: 24px; display: block; }
-  .bnav-item .bnav-lbl { font-size: 10px; font-weight: 600; letter-spacing: 0.01em; }
+  .bnav-item .bnav-lbl { font-size: 9.5px; font-weight: 600; letter-spacing: 0.01em; white-space: nowrap; }
   .bnav-item.active { color: var(--accent); }
   .bnav-item.active .bnav-ic { opacity: 1; filter: drop-shadow(0 0 6px rgba(84, 219, 200, 0.6)); }
   .bnav-item:active { transform: scale(0.9); }

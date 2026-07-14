@@ -94,11 +94,12 @@ async function generate(client: any, prompt: string, isVoice = false, context: a
       body: { type: 'string' },
       when: { type: 'string' },
       answer: { type: 'string' },
+      spoken: { type: 'string' },
       matchedIds: { type: 'array', items: { type: 'string' } },
       shareWith: { type: 'string' },
       summary: { type: 'string' }
     },
-    required: ['intent', 'title', 'items', 'body', 'when', 'answer', 'matchedIds', 'shareWith', 'summary']
+    required: ['intent', 'title', 'items', 'body', 'when', 'answer', 'spoken', 'matchedIds', 'shareWith', 'summary']
   };
   let userContent = '';
   if (now) userContent += 'JETZT (aktuelles Datum/Uhrzeit des Nutzers): ' + now + '\n';
@@ -129,6 +130,7 @@ async function generate(client: any, prompt: string, isVoice = false, context: a
       '• "query" – der Nutzer FRAGT etwas über seine vorhandenen Notizen ("Wann ist mein nächstes Padel-Spiel?", "Habe ich am Mittwoch was vor?", "Was steht auf der Einkaufsliste?"). ' +
       'Beantworte die Frage NUR anhand der mitgelieferten VORHANDENEN NOTIZEN in "answer" – kurz, freundlich, konkret (nenne Datum/Uhrzeit/Ort, rechne Datumsangaben mit JETZT um, z. B. "morgen"). ' +
       'Trage die ids der passenden Notizen in "matchedIds" ein. Findest du nichts Passendes, sag das ehrlich in "answer" ("Dazu habe ich nichts in deinen Notizen gefunden."). ' +
+      '"spoken" (nur bei query, sonst leer): ULTRA-KURZE Sprachfassung der Antwort zum Vorlesen – maximal ~10 Wörter, nur die Kerninfo, keine Floskeln, keine Emojis. Beispiel: answer="Ja! Am Mittwoch, den 15. Juli um 20:00 Uhr hast du Padel in der Halle mit Patrick. 🎾" → spoken="Mittwoch 20 Uhr: Padel mit Patrick.". ' +
       'Bei "query": KEINE Notiz erstellen – "title" leer, "items" leer. NIEMALS Notizen erfinden, die nicht in den Daten stehen.\n' +
       'Im Zweifel zwischen "note" und "list": Werden 3+ getrennte Dinge/Aufgaben genannt → "list", sonst "note". ' +
       'FRAGEN ERKENNEN (großzügig!): Beginnt oder klingt die Eingabe wie eine Frage – Fragewörter wie wann/was/wo/wer/wie/welche, "habe ich", "hab ich", "gibt es", "steht (irgend)was", when/what/do I have/is there – dann IMMER intent="query", auch OHNE Fragezeichen und auch bei holpriger Transkription.\n' +

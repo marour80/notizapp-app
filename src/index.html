@@ -103,6 +103,10 @@
         <span class="bnav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span>
         <span class="bnav-lbl">Notizen</span>
       </button>
+      <button class="bnav-item" data-nav="termine">
+        <span class="bnav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg></span>
+        <span class="bnav-lbl">Termine</span>
+      </button>
       <button class="bnav-item" data-nav="friends">
         <span class="bnav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><path d="M16 5.3a3 3 0 0 1 0 5.4"/><path d="M17.6 14.7c1.9.7 3.4 2.6 3.4 5.3"/></svg></span>
         <span class="bnav-lbl">Freunde</span>
@@ -185,6 +189,18 @@
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- Termine-Screen (eigener Tab in der Bottom-Nav) -->
+  <div id="termineScreen" class="termine-screen">
+    <div class="termine-head">
+      <h2>📅 <span data-i18n="agendaTitle">Termine</span></h2>
+    </div>
+    <ul id="termineList" class="termine-list"></ul>
+    <div id="termineEmpty" class="termine-empty hidden">
+      <span class="te-icon">🗓️</span>
+      <p data-i18n="agendaEmpty">Noch keine Termine – sprich einfach einen ein! 🎤</p>
+    </div>
   </div>
 
   <!-- Teilen-Dialog -->
