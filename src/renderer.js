@@ -223,13 +223,94 @@ function renderFolderSelect() {
   });
 }
 
+// ---- Agenda: Notizen mit Termin als eigene, chronologische Sektion ----
+function whenDate(n) {
+  if (!n.when) return null;
+  const hasTime = String(n.when).includes('T');
+  const d = new Date(hasTime ? n.when : n.when + 'T12:00');
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function agendaBucket(d) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = Math.round((day - today) / 86400000);
+  if (diff < 0) return 'past';
+  if (diff === 0) return 'today';
+  if (diff === 1) return 'tomorrow';
+  if (diff < 7) return 'week';
+  return 'later';
+}
+
+function agendaRow(n, d) {
+  const loc = (window.NZI18N && NZI18N.lang === 'en') ? 'en-US' : 'de-DE';
+  const wd = d.toLocaleDateString(loc, { weekday: 'short' }).replace('.', '');
+  const hasTime = String(n.when).includes('T');
+  const time = hasTime ? d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }) : '';
+  const snippet = stripMd(n.body || '');
+  const sub = [time, snippet].filter(Boolean).join(' · ');
+  const li = document.createElement('li');
+  li.className = 'agenda-item';
+  li.innerHTML = `
+    <div class="agenda-tile"><span class="ag-wd">${escapeHtml(wd)}</span><span class="ag-day">${d.getDate()}</span></div>
+    <div class="agenda-main">
+      <div class="agenda-title">${escapeHtml(n.title) || t('untitled')}</div>
+      ${sub ? `<div class="agenda-sub">${escapeHtml(sub)}</div>` : ''}
+    </div>
+    ${n.share && n.share.code ? '<span class="agenda-share">🔗</span>' : ''}`;
+  li.onclick = () => openNote(n.id);
+  return li;
+}
+
+function renderAgenda(dated) {
+  if (!dated.length) return null;
+  const wrap = document.createElement('li');
+  wrap.className = 'agenda-wrap';
+  const buckets = { today: [], tomorrow: [], week: [], later: [], past: [] };
+  dated.forEach((n) => buckets[agendaBucket(whenDate(n))].push(n));
+  const byWhen = (a, b) => whenDate(a) - whenDate(b);
+  const section = document.createElement('div');
+  section.className = 'agenda';
+  section.innerHTML = `<div class="agenda-head">📅 <span>${t('agendaTitle')}</span></div>`;
+  [['today', 'agendaToday'], ['tomorrow', 'agendaTomorrow'], ['week', 'agendaWeek'], ['later', 'agendaLater']].forEach(([key, label]) => {
+    const arr = buckets[key].sort(byWhen);
+    if (!arr.length) return;
+    const g = document.createElement('div');
+    g.className = 'agenda-group agenda-' + key;
+    g.innerHTML = `<div class="agenda-label">${t(label)}</div>`;
+    const ul = document.createElement('ul');
+    arr.forEach((n) => ul.appendChild(agendaRow(n, whenDate(n))));
+    g.appendChild(ul);
+    section.appendChild(g);
+  });
+  const past = buckets.past.sort((a, b) => whenDate(b) - whenDate(a));
+  if (past.length) {
+    const det = document.createElement('details');
+    det.className = 'agenda-past';
+    det.innerHTML = `<summary>${t('agendaPast')} (${past.length})</summary>`;
+    const ul = document.createElement('ul');
+    past.forEach((n) => ul.appendChild(agendaRow(n, whenDate(n))));
+    det.appendChild(ul);
+    section.appendChild(det);
+  }
+  wrap.appendChild(section);
+  return wrap;
+}
+
 function renderNoteList() {
-  const list = filteredNotes();
-  $('noteCount').textContent = list.length;
+  const all = filteredNotes();
+  $('noteCount').textContent = all.length;
   $('listTitle').textContent = currentFolder === '__all__' ? t('allNotes') : currentFolder;
 
   noteListEl.innerHTML = '';
-  $('emptyList').classList.toggle('hidden', list.length > 0);
+  $('emptyList').classList.toggle('hidden', all.length > 0);
+
+  // Termin-Notizen wandern in die Agenda-Sektion, der Rest bleibt als Karten.
+  const dated = all.filter((n) => whenDate(n));
+  const list = all.filter((n) => !whenDate(n));
+  const agenda = renderAgenda(dated);
+  if (agenda) noteListEl.appendChild(agenda);
 
   list.forEach((n) => {
     const status = deriveStatus(n);
