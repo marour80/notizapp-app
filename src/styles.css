@@ -13,8 +13,8 @@
   --radius: 12px;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
   /* Glass/HUD-Redesign (solide Kartenflaeche – kein backdrop-blur: sauberer + performant) */
-  --glass: #192027;
-  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass: #1b242d;
+  --glass-border: rgba(255, 255, 255, 0.11);
   --glow: 0 0 20px rgba(84, 219, 200, 0.35);
 }
 
@@ -31,7 +31,7 @@
   --accent-soft: rgba(18, 179, 161, 0.12);
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
   --glass: #ffffff;
-  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-border: rgba(0, 0, 0, 0.10);
   --glow: 0 0 20px rgba(18, 179, 161, 0.25);
 }
 
@@ -342,7 +342,7 @@ input, textarea, [contenteditable], .body-input, .preview {
   position: relative;
   overflow: hidden;
   border-radius: 14px;
-  margin-bottom: 12px;
+  margin-bottom: 20px; /* deutliche Luft zwischen den Karten */
   --sc: var(--accent); /* Statusfarbe (Akzentlinie + Fortschritt) */
 }
 .note-card.status-todo { --sc: #ff5c72; }
@@ -358,7 +358,8 @@ input, textarea, [contenteditable], .body-input, .preview {
   cursor: pointer;
   transform: translateX(0);
   transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  /* kompakter, gerichteter Schatten: Kante bleibt klar, Karten heben sich sauber ab */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   touch-action: pan-y; /* vertikal scrollen; horizontal = Wischen */
 }
 /* farbige Akzentlinie oben (Status) */
