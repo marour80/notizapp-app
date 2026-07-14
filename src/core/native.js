@@ -89,10 +89,23 @@
   function voiceRec() {
     return plugin('VoiceRecorder');
   }
+  // Eigenes NZRecorder-Plugin (mit Live-Pegel für die Aufnahme-Animation) – bevorzugt.
+  function nzRec() {
+    return plugin('NZRecorder');
+  }
   function nativeRecordAvailable() {
-    return isIOS() && !!voiceRec();
+    return isIOS() && !!(nzRec() || voiceRec());
   }
   async function startNativeRecording() {
+    const R = nzRec();
+    if (R) {
+      try {
+        const r = await R.start();
+        return !!(r && r.ok);
+      } catch {
+        return false;
+      }
+    }
     const VR = voiceRec();
     if (!VR) return false;
     try {
@@ -107,6 +120,14 @@
     }
   }
   async function stopNativeRecording() {
+    const R = nzRec();
+    if (R) {
+      try {
+        const r = await R.stop();
+        if (r && r.ok && r.base64) return { base64: r.base64, mimeType: r.mimeType || 'audio/aac' };
+      } catch {}
+      return null;
+    }
     const VR = voiceRec();
     if (!VR) return null;
     try {
@@ -115,6 +136,29 @@
       if (v && v.recordDataBase64) return { base64: v.recordDataBase64, mimeType: v.mimeType || 'audio/aac' };
     } catch {}
     return null;
+  }
+  // Aufnahme verwerfen (Abbrechen) – Ergebnis interessiert nicht.
+  async function cancelNativeRecording() {
+    const R = nzRec();
+    if (R) {
+      try { await R.cancel(); } catch {}
+      return;
+    }
+    const VR = voiceRec();
+    if (VR) {
+      try { await VR.stopRecording(); } catch {}
+    }
+  }
+  // Aktueller Mikrofonpegel 0..1 (nur mit NZRecorder verfügbar, sonst null).
+  async function getRecordingLevel() {
+    const R = nzRec();
+    if (!R) return null;
+    try {
+      const r = await R.level();
+      return r && typeof r.level === 'number' ? r.level : 0;
+    } catch {
+      return null;
+    }
   }
 
   // ---- Externen Browser öffnen (für OAuth-Login) ----
@@ -216,5 +260,5 @@
     });
   }
 
-  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, registerPush, parseCode, plugin, initKeyboard };
+  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, parseCode, plugin, initKeyboard };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1866,16 +1866,19 @@ function startVoiceOrb(stream) {
     '  vec2 uv = (gl_FragCoord.xy*2.0 - u_res) / min(u_res.x,u_res.y);\n' +
     '  float d = length(uv);\n' +
     '  float lv = clamp(u_level, 0.0, 1.0);\n' +
-    '  float R = 0.52 + lv*0.10;\n' +                 // Kugel atmet mit der Lautstärke
+    '  float R = 0.38 + lv*0.09;\n' +                 // Kugel atmet mit der Lautstärke
     '  float sphere = smoothstep(R, R-0.02, d);\n' +
-    '  float w1 = abs(sin(d*14.0 - u_time*5.0)) * (0.04+lv*0.10) / max(abs(d-R-0.10), 0.02);\n' +
-    '  float w2 = abs(sin(d*9.0 - u_time*2.5)) * (0.02+lv*0.06) / max(abs(d-R-0.28), 0.03);\n' +
-    '  float glow = (0.05+lv*0.10) / max(d, 0.05);\n' +
+    '  float w1 = abs(sin(d*14.0 - u_time*5.0)) * (0.03+lv*0.09) / max(abs(d-R-0.08), 0.02);\n' +
+    '  float w2 = abs(sin(d*9.0 - u_time*2.5)) * (0.015+lv*0.05) / max(abs(d-R-0.22), 0.03);\n' +
+    '  float glow = (0.04+lv*0.09) / max(d, 0.05);\n' +
     '  float mesh = abs(sin(uv.x*18.0 + u_time*0.6)) * abs(sin(uv.y*18.0 - u_time*0.4));\n' +
     '  vec3 teal = vec3(0.329, 0.859, 0.784);\n' +   // App-Akzent #54dbc8
     '  vec3 col = teal * (w1 + w2 + glow) + teal * mesh * 0.10 * sphere;\n' +
     '  col += vec3(1.0) * sphere * (0.03 + lv*0.05);\n' +
-    '  float a = clamp(max(max(col.r, col.g), col.b), 0.0, 1.0);\n' +
+    // Vignette: alles läuft deutlich VOR dem Canvas-Rand weich aus → keine sichtbare Box
+    '  float vign = smoothstep(0.95, 0.55, d);\n' +
+    '  col *= vign;\n' +
+    '  float a = clamp(max(max(col.r, col.g), col.b), 0.0, 1.0) * vign;\n' +
     '  gl_FragColor = vec4(col, a);\n' +
     '}';
   function sh(type, src) {
@@ -1904,8 +1907,8 @@ function startVoiceOrb(stream) {
   const uLevel = gl.getUniformLocation(prog, 'u_level');
   const uRes = gl.getUniformLocation(prog, 'u_res');
 
-  // Echt-Pegel (wenn ein Stream da ist), sonst Simulation. Bleibt ein Stream
-  // länger still (>1.5 s), wechseln wir weich in die Simulation.
+  // Echt-Pegel: Web/Android über AnalyserNode (Stream), iOS über das native
+  // NZRecorder-Metering (gepollt). Nur wenn beides fehlt → Sprech-Simulation.
   let analyser = null;
   let dataArr = null;
   let actx = null;
@@ -1919,13 +1922,29 @@ function startVoiceOrb(stream) {
       dataArr = new Uint8Array(analyser.frequencyBinCount);
     } catch {}
   }
+  // iOS: nativen Pegel regelmäßig abfragen (AVAudioRecorder-Metering, wie beim Sprachmemo-Recorder)
+  let nativeRaw = -1; // -1 = (noch) kein nativer Pegel verfügbar
+  let levelTimer = null;
+  if (!stream && window.NZNative && NZNative.getRecordingLevel) {
+    levelTimer = setInterval(async () => {
+      const lv = await NZNative.getRecordingLevel();
+      if (lv === null) {
+        clearInterval(levelTimer);
+        levelTimer = null;
+        nativeRaw = -1; // Plugin fehlt (alte App) → Simulation
+        return;
+      }
+      // Sprache liegt linear grob bei 0.01–0.35 → verstärken, damit es sichtbar schwingt
+      nativeRaw = Math.min(1, Math.pow(lv, 0.6) * 1.6);
+    }, 66);
+  }
   let level = 0;
   let silentMs = 0;
   let last = performance.now();
   function frame(t) {
     const dt = t - last;
     last = t;
-    let raw = 0;
+    let raw = -1;
     if (analyser) {
       analyser.getByteTimeDomainData(dataArr);
       let sum = 0;
@@ -1934,15 +1953,17 @@ function startVoiceOrb(stream) {
         sum += v * v;
       }
       raw = Math.min(1, Math.sqrt(sum / dataArr.length) * 4);
+    } else if (nativeRaw >= 0) {
+      raw = nativeRaw;
     }
-    if (raw < 0.03) silentMs += dt; else silentMs = 0;
-    let target = raw;
-    if (!analyser || silentMs > 1500) {
-      // Sprech-Simulation: mehrere überlagerte Wellen wirken wie natürliche Sprachdynamik
+    if (raw >= 0 && raw < 0.03) silentMs += dt; else silentMs = 0;
+    let target = Math.max(raw, 0.06); // nie ganz tot – leichter Grundpuls
+    if (raw < 0 || silentMs > 4000) {
+      // Kein echter Pegel verfügbar (oder sehr lange still) → dezente Sprech-Simulation
       target = 0.3 + 0.18 * Math.sin(t * 0.004) + 0.14 * Math.sin(t * 0.011 + 1.7) + 0.1 * Math.sin(t * 0.023 + 0.5);
       target = Math.max(0.08, target);
     }
-    level += (target - level) * 0.18;
+    level += (target - level) * 0.35; // schnell folgen → schwingt WIE die Stimme, nicht hinterher
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -1952,13 +1973,14 @@ function startVoiceOrb(stream) {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     voiceOrb.raf = requestAnimationFrame(frame);
   }
-  voiceOrb = { raf: requestAnimationFrame(frame), gl, actx };
+  voiceOrb = { raf: requestAnimationFrame(frame), gl, actx, levelTimer: () => levelTimer };
 }
 
 function stopVoiceOrb() {
   if (!voiceOrb) return;
   cancelAnimationFrame(voiceOrb.raf);
   try { voiceOrb.actx && voiceOrb.actx.close(); } catch {}
+  try { const lt = voiceOrb.levelTimer && voiceOrb.levelTimer(); if (lt) clearInterval(lt); } catch {}
   voiceOrb = null;
 }
 
@@ -2052,7 +2074,7 @@ function closeVoice() {
   if (nativeRecording) {
     nativeRecording = false;
     try {
-      NZNative.stopNativeRecording();
+      NZNative.cancelNativeRecording ? NZNative.cancelNativeRecording() : NZNative.stopNativeRecording();
     } catch {}
   } else if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.onstop = null; // verwerfen, nicht verarbeiten

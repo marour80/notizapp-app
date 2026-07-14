@@ -988,7 +988,14 @@ input, textarea, [contenteditable], .body-input, .preview {
 
 /* Voice-Orb: reagierende Kugel während der Aufnahme */
 .voice-orb-wrap { display: flex; justify-content: center; margin: 4px 0 8px; }
-.voice-orb { width: 190px; height: 190px; display: block; }
+.voice-orb {
+  width: 200px;
+  height: 200px;
+  display: block;
+  /* runde Maske: schneidet jede Rest-Kante weg → Kugel schwebt frei, keine Box */
+  -webkit-mask-image: radial-gradient(circle, #000 55%, transparent 71%);
+  mask-image: radial-gradient(circle, #000 55%, transparent 71%);
+}
 
 /* Einfache Notiz in der Sprach-Vorschau */
 .voice-preview-body { font-size: 14px; color: var(--text-dim); line-height: 1.5; margin-bottom: 8px; white-space: pre-wrap; }
