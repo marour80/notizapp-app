@@ -240,6 +240,48 @@
     return true;
   }
 
+  // ---- Lokale Benachrichtigungen (Termin-Erinnerungen, komplett auf dem Gerät) ----
+  function remindersAvailable() {
+    return !!plugin('LocalNotifications');
+  }
+  async function requestReminderPermission() {
+    const LN = plugin('LocalNotifications');
+    if (!LN) return false;
+    try {
+      const p = await LN.requestPermissions();
+      return !!(p && p.display === 'granted');
+    } catch {
+      return false;
+    }
+  }
+  // Ersetzt ALLE geplanten Erinnerungen durch die übergebene Liste
+  // items: [{ id:int, title, body, at:Date }]
+  async function replaceReminders(items) {
+    const LN = plugin('LocalNotifications');
+    if (!LN) return false;
+    try {
+      const pending = await LN.getPending();
+      const ids = ((pending && pending.notifications) || []).map((n) => ({ id: n.id }));
+      if (ids.length) await LN.cancel({ notifications: ids });
+    } catch {}
+    if (!items || !items.length) return true;
+    try {
+      await LN.schedule({
+        notifications: items.map((it) => ({
+          id: it.id,
+          title: it.title,
+          body: it.body,
+          schedule: { at: it.at },
+          sound: 'default'
+        }))
+      });
+      return true;
+    } catch (e) {
+      console.warn('[Reminder] schedule fehlgeschlagen:', e);
+      return false;
+    }
+  }
+
   // ---- Tastatur (iOS): Editor-Bereich über die Tastatur schrumpfen, statt den ganzen Screen zu schieben ----
   // Setzt --kb-height (Tastaturhöhe) und body.kb-open; das CSS verkleinert dann nur den Editor.
   function initKeyboard() {
@@ -260,5 +302,5 @@
     });
   }
 
-  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, parseCode, plugin, initKeyboard };
+  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, parseCode, plugin, initKeyboard };
 })(typeof window !== 'undefined' ? window : globalThis);

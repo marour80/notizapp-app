@@ -85,6 +85,7 @@ function notifyShared(info) {
   const theme = localStorage.getItem('theme') || 'dark';
   applyTheme(theme);
   renderAll();
+  scheduleReminderRefresh(); // geplante Termin-Erinnerungen an den aktuellen Stand angleichen
 })();
 
 // ---- Sprache anwenden / umschalten ----
@@ -157,6 +158,71 @@ NZStore.onChanged(async (info) => {
 
 function persist() {
   NZStore.save(data);
+  scheduleReminderRefresh(); // Termin-Erinnerungen an den neuen Stand anpassen
+}
+
+// ---- Termin-Erinnerungen (lokale Benachrichtigungen, ganz aufs Gerät geplant) ----
+const REM_LEADS = [
+  { min: 0, key: 'leadAtTime' },
+  { min: 30, key: 'lead30' },
+  { min: 60, key: 'lead60' },
+  { min: 180, key: 'lead180' },
+  { min: 1440, key: 'lead1d' },
+  { min: 2880, key: 'lead2d' },
+  { min: 10080, key: 'lead7d' }
+];
+
+function remOn() {
+  return localStorage.getItem('nz_rem_on') !== '0'; // Standard: an
+}
+function remLeads() {
+  try {
+    const a = JSON.parse(localStorage.getItem('nz_rem_leads') || '[60,1440]');
+    return Array.isArray(a) && a.length ? a : [60, 1440];
+  } catch {
+    return [60, 1440];
+  }
+}
+
+// Stabile Ganzzahl-ID pro Notiz+Vorlauf (LocalNotifications braucht int-IDs).
+function remId(noteId, lead) {
+  const s = noteId + ':' + lead;
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return Math.abs(h) % 2147483647;
+}
+
+let remTimer = null;
+function scheduleReminderRefresh() {
+  clearTimeout(remTimer);
+  remTimer = setTimeout(rescheduleReminders, 800);
+}
+
+async function rescheduleReminders() {
+  if (!(window.NZNative && NZNative.remindersAvailable && NZNative.remindersAvailable())) return;
+  if (!remOn()) {
+    NZNative.replaceReminders([]);
+    return;
+  }
+  const now = Date.now();
+  const items = [];
+  const leads = remLeads();
+  (data.notes || []).forEach((n) => {
+    const d = whenDate(n);
+    if (!d || n.termDone) return;
+    leads.forEach((lead) => {
+      const at = d.getTime() - lead * 60000;
+      if (at <= now) return;
+      const leadOpt = REM_LEADS.find((o) => o.min === lead);
+      items.push({
+        id: remId(n.id, lead),
+        title: '📅 ' + (n.title || t('untitled')),
+        body: formatWhen(n.when) + (lead ? ' · ' + t(leadOpt ? leadOpt.key : 'lead60') : ''),
+        at: new Date(at)
+      });
+    });
+  });
+  NZNative.replaceReminders(items);
 }
 
 // ---- Filtering ----
@@ -243,7 +309,7 @@ function agendaBucket(d) {
   return 'later';
 }
 
-function agendaRow(n, d) {
+function agendaRow(n, d, askDone) {
   const loc = (window.NZI18N && NZI18N.lang === 'en') ? 'en-US' : 'de-DE';
   const wd = d.toLocaleDateString(loc, { weekday: 'short' }).replace('.', '');
   const hasTime = String(n.when).includes('T');
@@ -251,15 +317,25 @@ function agendaRow(n, d) {
   const snippet = stripMd(n.body || '');
   const sub = [time, snippet].filter(Boolean).join(' · ');
   const li = document.createElement('li');
-  li.className = 'agenda-item';
+  li.className = 'agenda-item' + (askDone ? ' agenda-ask' : '');
   li.innerHTML = `
     <div class="agenda-tile"><span class="ag-wd">${escapeHtml(wd)}</span><span class="ag-day">${d.getDate()}</span></div>
     <div class="agenda-main">
       <div class="agenda-title">${escapeHtml(n.title) || t('untitled')}</div>
       ${sub ? `<div class="agenda-sub">${escapeHtml(sub)}</div>` : ''}
     </div>
-    ${n.share && n.share.code ? '<span class="agenda-share">🔗</span>' : ''}`;
+    ${n.share && n.share.code ? '<span class="agenda-share">🔗</span>' : ''}
+    ${askDone ? `<button class="agenda-done-btn" title="${t('markDone')}">✓</button>` : ''}`;
   li.onclick = () => openNote(n.id);
+  if (askDone) {
+    li.querySelector('.agenda-done-btn').onclick = (e) => {
+      e.stopPropagation();
+      n.termDone = true; // bestätigt → wandert nach "Vergangen"
+      n.updatedAt = Date.now();
+      persist();
+      renderTermine();
+    };
+  }
   return li;
 }
 
@@ -284,7 +360,19 @@ function renderAgenda(dated, withHead) {
     g.appendChild(ul);
     section.appendChild(g);
   });
-  const past = buckets.past.sort((a, b) => whenDate(b) - whenDate(a));
+  // Vorbei, aber noch nicht bestätigt → erst fragen "erledigt?", dann ab nach Vergangen.
+  const pastAll = buckets.past.sort((a, b) => whenDate(b) - whenDate(a));
+  const pastOpen = pastAll.filter((n) => !n.termDone);
+  const past = pastAll.filter((n) => n.termDone);
+  if (pastOpen.length) {
+    const g = document.createElement('div');
+    g.className = 'agenda-group agenda-askdone';
+    g.innerHTML = `<div class="agenda-label">${t('agendaDoneAsk')}</div>`;
+    const ul = document.createElement('ul');
+    pastOpen.forEach((n) => ul.appendChild(agendaRow(n, whenDate(n), true)));
+    g.appendChild(ul);
+    section.appendChild(g);
+  }
   if (past.length) {
     const det = document.createElement('details');
     det.className = 'agenda-past';
@@ -2601,10 +2689,65 @@ document.querySelectorAll('#bottomNav .bnav-item').forEach((btn) => {
   };
 });
 
+// ---- Termin-Erinnerungen: Einstellungs-Dialog ----
+function reminderSummary() {
+  if (!remOn()) return t('off');
+  const leads = remLeads();
+  const labels = REM_LEADS.filter((o) => leads.includes(o.min)).map((o) => t(o.key + 'Short'));
+  return labels.length ? labels.join(' · ') : t('off');
+}
+
+function renderReminderModal() {
+  const tgl = $('reminderToggle');
+  tgl.classList.toggle('on', remOn());
+  tgl.setAttribute('aria-checked', remOn() ? 'true' : 'false');
+  const box = $('reminderChips');
+  box.innerHTML = '';
+  const leads = remLeads();
+  REM_LEADS.forEach((o) => {
+    const b = document.createElement('button');
+    b.className = 'rchip' + (leads.includes(o.min) ? ' on' : '');
+    b.textContent = t(o.key);
+    b.onclick = () => {
+      let cur = remLeads();
+      if (cur.includes(o.min)) cur = cur.filter((x) => x !== o.min);
+      else cur.push(o.min);
+      localStorage.setItem('nz_rem_leads', JSON.stringify(cur));
+      renderReminderModal();
+      scheduleReminderRefresh();
+    };
+    box.appendChild(b);
+  });
+  box.classList.toggle('dimmed', !remOn());
+}
+
+function openReminderModal() {
+  renderReminderModal();
+  $('reminderPermHint').classList.add('hidden');
+  $('reminderModal').classList.remove('hidden');
+}
+
+$('setReminderRow').onclick = openReminderModal;
+$('reminderClose').onclick = () => {
+  $('reminderModal').classList.add('hidden');
+  if ($('setReminderVal')) $('setReminderVal').textContent = reminderSummary();
+};
+$('reminderToggle').onclick = async () => {
+  const turningOn = !remOn();
+  localStorage.setItem('nz_rem_on', turningOn ? '1' : '0');
+  if (turningOn && window.NZNative && NZNative.requestReminderPermission) {
+    const ok = await NZNative.requestReminderPermission();
+    $('reminderPermHint').classList.toggle('hidden', ok);
+  }
+  renderReminderModal();
+  scheduleReminderRefresh();
+};
+
 // ---- Einstellungen-Screen (nutzt die bestehende Theme-/Sprache-/Konto-Logik) ----
 function openSettings() {
   const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
   if ($('setThemeVal')) $('setThemeVal').textContent = isDark ? t('themeDark') : t('themeLight');
+  if ($('setReminderVal')) $('setReminderVal').textContent = reminderSummary();
   if ($('setLangVal')) {
     const lang = (window.NZI18N && typeof NZI18N.lang === 'function') ? NZI18N.lang() : (document.documentElement.lang || 'de');
     $('setLangVal').textContent = String(lang).toUpperCase();

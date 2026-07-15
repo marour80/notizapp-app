@@ -223,6 +223,10 @@
           <span class="setting-label">🌐 Sprache</span>
           <span id="setLangVal" class="setting-val"></span>
         </button>
+        <button id="setReminderRow" class="setting-row">
+          <span class="setting-label">⏰ <span data-i18n="reminders">Termin-Erinnerungen</span></span>
+          <span id="setReminderVal" class="setting-val"></span>
+        </button>
         <button id="setAccountRow" class="setting-row setting-account">
           <span class="setting-acc">
             <span class="acc-title">👤 Konto &amp; Name</span>
@@ -232,6 +236,21 @@
         </button>
       </div>
       <div id="setVersion" class="settings-version"></div>
+    </div>
+  </div>
+
+  <!-- Termin-Erinnerungen konfigurieren -->
+  <div id="reminderModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" id="reminderClose">✕</button>
+      <h2>⏰ <span data-i18n="reminders">Termin-Erinnerungen</span></h2>
+      <div class="reminder-toggle-row">
+        <span data-i18n="remindersOn">Erinnerungen aktiv</span>
+        <button id="reminderToggle" class="switch" role="switch" aria-checked="true"><span class="knob"></span></button>
+      </div>
+      <p class="modal-hint" data-i18n="remindersHint">Wann sollen wir dich vor einem Termin erinnern? (Mehrfachauswahl)</p>
+      <div id="reminderChips" class="reminder-chips"></div>
+      <p id="reminderPermHint" class="modal-hint hidden" data-i18n="remindersPermHint">Bitte Mitteilungen für SmartNote in den iOS-Einstellungen erlauben.</p>
     </div>
   </div>
 

@@ -44,6 +44,7 @@
     "@capacitor/core": "^8.4.0",
     "@capacitor/ios": "^8.4.1",
     "@capacitor/keyboard": "^8.0.5",
+    "@capacitor/local-notifications": "^8.2.0",
     "@supabase/supabase-js": "^2.107.0",
     "capacitor-voice-recorder": "^7.0.6"
   }
