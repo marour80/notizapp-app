@@ -84,6 +84,47 @@ struct DayTile: View {
     }
 }
 
+// ---- Sperrbildschirm-Formate (iOS 16+) ----
+@available(iOSApplicationExtension 16.0, *)
+struct AccessoryRectView: View {
+    let entry: TerminEntry
+    var body: some View {
+        if let first = entry.termine.first, let d = parseWhen(first.when) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(first.title)
+                    .font(.headline)
+                    .widgetAccentable()
+                    .lineLimit(1)
+                Text(d.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)) + (first.when.contains("T") ? " · " + d.formatted(.dateTime.hour().minute()) : ""))
+                    .font(.caption2)
+                if entry.termine.count > 1 {
+                    Text(entry.termine[1].title)
+                        .font(.caption2)
+                        .opacity(0.65)
+                        .lineLimit(1)
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("SmartNote").font(.headline).widgetAccentable()
+                Text("Keine Termine 🎉").font(.caption2)
+            }
+        }
+    }
+}
+
+@available(iOSApplicationExtension 16.0, *)
+struct AccessoryInlineView: View {
+    let entry: TerminEntry
+    var body: some View {
+        if let first = entry.termine.first, let d = parseWhen(first.when) {
+            Text("📅 \(first.title)" + (first.when.contains("T") ? " \(d.formatted(.dateTime.hour().minute()))" : ""))
+        } else {
+            Text("📅 Keine Termine")
+        }
+    }
+}
+
 struct TermineView: View {
     let entry: TerminEntry
     @Environment(\.widgetFamily) var family
@@ -138,22 +179,52 @@ struct TermineView: View {
     }
 }
 
-struct SmartNoteWidget: Widget {
-    let kind: String = "SmartNoteWidget"
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: Provider()) { entry in
+// Wählt je Widget-Familie die passende Ansicht (Homescreen vs. Sperrbildschirm).
+struct WidgetRootView: View {
+    let entry: TerminEntry
+    @Environment(\.widgetFamily) var family
+    var body: some View {
+        if #available(iOSApplicationExtension 16.0, *), family == .accessoryRectangular {
             if #available(iOSApplicationExtension 17.0, *) {
-                TermineView(entry: entry)
-                    .containerBackground(for: .widget) { bgColor }
+                AccessoryRectView(entry: entry).containerBackground(for: .widget) { Color.clear }
+            } else {
+                AccessoryRectView(entry: entry)
+            }
+        } else if #available(iOSApplicationExtension 16.0, *), family == .accessoryInline {
+            if #available(iOSApplicationExtension 17.0, *) {
+                AccessoryInlineView(entry: entry).containerBackground(for: .widget) { Color.clear }
+            } else {
+                AccessoryInlineView(entry: entry)
+            }
+        } else {
+            if #available(iOSApplicationExtension 17.0, *) {
+                TermineView(entry: entry).containerBackground(for: .widget) { bgColor }
             } else {
                 TermineView(entry: entry)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(bgColor)
             }
         }
+    }
+}
+
+struct SmartNoteWidget: Widget {
+    let kind: String = "SmartNoteWidget"
+
+    var families: [WidgetFamily] {
+        if #available(iOSApplicationExtension 16.0, *) {
+            return [.systemSmall, .systemMedium, .accessoryRectangular, .accessoryInline]
+        }
+        return [.systemSmall, .systemMedium]
+    }
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: Provider()) { entry in
+            WidgetRootView(entry: entry)
+        }
         .configurationDisplayName("Nächste Termine")
         .description("Deine anstehenden SmartNote-Termine auf einen Blick.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies(families)
     }
 }
 
