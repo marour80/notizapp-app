@@ -1310,6 +1310,14 @@ body:not(.settings-open) .settings-screen { display: none; }
 }
 .switch.on { background: var(--accent); }
 .switch.on .knob { transform: translateX(20px); }
+.brief-time-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 14px;
+}
 .reminder-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .reminder-chips.dimmed { opacity: 0.35; pointer-events: none; }
 .rchip {

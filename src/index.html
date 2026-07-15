@@ -240,9 +240,29 @@
         <button id="setReminderRow" class="sset-row">
           <span class="sset-ic">⏰</span><span class="sset-lbl" data-i18n="reminders">Termin-Erinnerungen</span><span id="setReminderVal" class="sset-val"></span><span class="sset-chev">›</span>
         </button>
+        <button id="setBriefRow" class="sset-row">
+          <span class="sset-ic">☀️</span><span class="sset-lbl" data-i18n="briefing">Morgen-Briefing</span><span id="setBriefVal" class="sset-val"></span><span class="sset-chev">›</span>
+        </button>
       </div>
 
       <div id="setVersion" class="settings-version"></div>
+    </div>
+  </div>
+
+  <!-- Morgen-Briefing konfigurieren -->
+  <div id="briefingModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" id="briefClose">✕</button>
+      <h2>☀️ <span data-i18n="briefing">Morgen-Briefing</span></h2>
+      <p class="modal-hint" data-i18n="briefingHint">Jeden Morgen eine kurze Übersicht: deine Termine des Tages und offene Aufgaben.</p>
+      <div class="reminder-toggle-row">
+        <span data-i18n="briefingOn">Briefing aktiv</span>
+        <button id="briefToggle" class="switch" role="switch"><span class="knob"></span></button>
+      </div>
+      <div class="brief-time-row">
+        <span data-i18n="briefingTime">Uhrzeit</span>
+        <input id="briefTime" type="time" class="when-input" value="08:00" />
+      </div>
     </div>
   </div>
 

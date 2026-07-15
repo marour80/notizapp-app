@@ -222,7 +222,58 @@ async function rescheduleReminders() {
       });
     });
   });
+
+  // ---- Morgen-Briefing: die nächsten 7 Tage vorausplanen (wird bei jedem Sync aktualisiert) ----
+  if (briefOn()) {
+    const [bh, bm] = briefTime().split(':').map(Number);
+    const openCount = (data.notes || []).reduce(
+      (sum, n) => sum + (n.subtasks || []).filter((s) => !s.deleted && (s.status || 'todo') !== 'done').length,
+      0
+    );
+    for (let day = 0; day < 7; day++) {
+      const at = new Date();
+      at.setDate(at.getDate() + day);
+      at.setHours(bh, bm || 0, 0, 0);
+      if (at.getTime() <= now) continue;
+      const dayTermine = (data.notes || [])
+        .filter((n) => {
+          const d = whenDate(n);
+          return d && !n.termDone && d.toDateString() === at.toDateString();
+        })
+        .sort((a, b) => whenDate(a) - whenDate(b));
+      const parts = dayTermine.slice(0, 3).map((n) => {
+        const d = whenDate(n);
+        const hm = String(n.when).includes('T')
+          ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+          : '';
+        return (n.title || t('untitled')) + (hm ? ' ' + hm : '');
+      });
+      if (dayTermine.length > 3) parts.push('+' + (dayTermine.length - 3));
+      if (!parts.length && !openCount) continue; // nichts zu berichten
+      const body =
+        (parts.length ? t('briefToday') + ': ' + parts.join(' · ') : t('briefNoTermine')) +
+        (openCount ? ' · ' + t('briefOpen', { n: openCount }) : '');
+      items.push({
+        id: remId('briefing', day),
+        title: t('briefTitle'),
+        body,
+        at
+      });
+    }
+  }
+
   NZNative.replaceReminders(items);
+}
+
+// ---- Morgen-Briefing: Einstellungen ----
+function briefOn() {
+  return localStorage.getItem('nz_brief_on') !== '0'; // Standard: an
+}
+function briefTime() {
+  return localStorage.getItem('nz_brief_time') || '08:00';
+}
+function briefSummary() {
+  return briefOn() ? briefTime() : t('off');
 }
 
 // ---- Filtering ----
@@ -2777,6 +2828,31 @@ function openReminderModal(note) {
 }
 
 $('setReminderRow').onclick = () => openReminderModal();
+
+// ---- Morgen-Briefing: Dialog ----
+function renderBriefModal() {
+  $('briefToggle').classList.toggle('on', briefOn());
+  $('briefTime').value = briefTime();
+}
+$('setBriefRow').onclick = () => {
+  renderBriefModal();
+  $('briefingModal').classList.remove('hidden');
+};
+$('briefClose').onclick = () => {
+  $('briefingModal').classList.add('hidden');
+  if ($('setBriefVal')) $('setBriefVal').textContent = briefSummary();
+};
+$('briefToggle').onclick = async () => {
+  const turningOn = !briefOn();
+  localStorage.setItem('nz_brief_on', turningOn ? '1' : '0');
+  if (turningOn && window.NZNative && NZNative.requestReminderPermission) await NZNative.requestReminderPermission();
+  renderBriefModal();
+  scheduleReminderRefresh();
+};
+$('briefTime').onchange = () => {
+  localStorage.setItem('nz_brief_time', $('briefTime').value || '08:00');
+  scheduleReminderRefresh();
+};
 $('reminderClose').onclick = () => {
   $('reminderModal').classList.add('hidden');
   if ($('setReminderVal')) $('setReminderVal').textContent = reminderSummary();
@@ -2809,6 +2885,7 @@ function openSettings() {
   const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
   if ($('setThemeVal')) $('setThemeVal').textContent = isDark ? t('themeDark') : t('themeLight');
   if ($('setReminderVal')) $('setReminderVal').textContent = reminderSummary();
+  if ($('setBriefVal')) $('setBriefVal').textContent = briefSummary();
   if ($('setLangVal')) {
     const lang = (window.NZI18N && typeof NZI18N.lang === 'function') ? NZI18N.lang() : (document.documentElement.lang || 'de');
     $('setLangVal').textContent = String(lang).toUpperCase();

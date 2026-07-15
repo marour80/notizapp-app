@@ -39,6 +39,8 @@
 	<string>SmartNote nutzt die Kamera fuer Fotos zu Aufgaben.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>SmartNote nutzt das Mikrofon fuer Sprachnotizen.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>SmartNote speichert auf Wunsch Fotos zu Teilaufgaben.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>SmartNote nutzt Fotos fuer Bilder zu Aufgaben.</string>
 	<key>UILaunchStoryboardName</key>
