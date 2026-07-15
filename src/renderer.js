@@ -263,6 +263,16 @@ async function rescheduleReminders() {
   }
 
   NZNative.replaceReminders(items);
+
+  // Homescreen-Widget mit den nächsten Terminen versorgen
+  if (NZNative.updateWidget) {
+    const widgetList = (data.notes || [])
+      .filter((n) => whenDate(n) && !n.termDone)
+      .sort((a, b) => whenDate(a) - whenDate(b))
+      .slice(0, 8)
+      .map((n) => ({ id: n.id, title: n.title || t('untitled'), when: String(n.when) }));
+    NZNative.updateWidget(widgetList);
+  }
 }
 
 // ---- Morgen-Briefing: Einstellungen ----

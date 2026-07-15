@@ -282,6 +282,18 @@
     }
   }
 
+  // ---- Homescreen-Widget: Termin-Daten in die App Group schieben ----
+  async function updateWidget(list) {
+    const W = plugin('NZWidget');
+    if (!W) return false;
+    try {
+      await W.update({ json: JSON.stringify(list || []) });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // ---- Tastatur (iOS): Editor-Bereich über die Tastatur schrumpfen, statt den ganzen Screen zu schieben ----
   // Setzt --kb-height (Tastaturhöhe) und body.kb-open; das CSS verkleinert dann nur den Editor.
   function initKeyboard() {
@@ -302,5 +314,5 @@
     });
   }
 
-  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, parseCode, plugin, initKeyboard };
+  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, updateWidget, parseCode, plugin, initKeyboard };
 })(typeof window !== 'undefined' ? window : globalThis);

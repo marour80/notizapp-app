@@ -14,16 +14,47 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		52C31832EA7347489F337A1A /* SmartNoteWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 5A93EB3639D867820042910B /* SmartNoteWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		6F1FFCEF9CF78F5A392FF599 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2D4353BB9450B50183EB235 /* Foundation.framework */; };
 		9BA7CB9188F5061B2DC91DF1 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 08CAD64D028A62B0242FFE69 /* GoogleService-Info.plist */; };
 		9EA37FDB148E9A35C52D5621 /* NZRecorderPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E911622F8A4F61B90BD225F /* NZRecorderPlugin.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
+		C5D6B1CFBE2C5E74FFCD350F /* SmartNoteWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EDC8A23A6E8B8B222B70963 /* SmartNoteWidget.swift */; };
+		E8042F8C114D71C4EB126BE4 /* NZWidgetPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 845AE67DCDDA2571C926596D /* NZWidgetPlugin.swift */; };
 		F943B4FA9258814B7AE8CCB4 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD8100D1C37487635072F07 /* MainViewController.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		81FE42B34E954B9D093FCD87 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 38805FF93DDF775417BFE1D5;
+			remoteInfo = SmartNoteWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C55B868337A5DDDBA8FBCFF3 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				52C31832EA7347489F337A1A /* SmartNoteWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		08CAD64D028A62B0242FFE69 /* GoogleService-Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		179EC56AF6A7201A594A0308 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		1E911622F8A4F61B90BD225F /* NZRecorderPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NZRecorderPlugin.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		49ADAD86483A7759E001AB43 /* SmartNoteWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = SmartNoteWidget.entitlements; sourceTree = "<group>"; };
+		4EDC8A23A6E8B8B222B70963 /* SmartNoteWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmartNoteWidget.swift; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -32,8 +63,11 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		5A93EB3639D867820042910B /* SmartNoteWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SmartNoteWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		845AE67DCDDA2571C926596D /* NZWidgetPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NZWidgetPlugin.swift; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
+		D2D4353BB9450B50183EB235 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		DDD8100D1C37487635072F07 /* MainViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -47,6 +81,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7D20AEC3327D681279625B3E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6F1FFCEF9CF78F5A392FF599 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -54,8 +96,17 @@
 			isa = PBXGroup;
 			children = (
 				AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */,
+				2EE583FDF701436D810039C5 /* iOS */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		2EE583FDF701436D810039C5 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				D2D4353BB9450B50183EB235 /* Foundation.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 		504EC2FB1FED79650016851F = {
@@ -65,6 +116,7 @@
 				504EC3051FED79650016851F /* Products */,
 				7F8756D8B27F46E3366F6CEA /* Pods */,
 				27E2DDA53C4D2A4D1A88CE4A /* Frameworks */,
+				F1135ADC131CBE8B1E8AA438 /* SmartNoteWidget */,
 			);
 			sourceTree = "<group>";
 		};
@@ -72,6 +124,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				5A93EB3639D867820042910B /* SmartNoteWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -90,6 +143,7 @@
 				08CAD64D028A62B0242FFE69 /* GoogleService-Info.plist */,
 				1E911622F8A4F61B90BD225F /* NZRecorderPlugin.swift */,
 				DDD8100D1C37487635072F07 /* MainViewController.swift */,
+				845AE67DCDDA2571C926596D /* NZWidgetPlugin.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -103,9 +157,37 @@
 			name = Pods;
 			sourceTree = "<group>";
 		};
+		F1135ADC131CBE8B1E8AA438 /* SmartNoteWidget */ = {
+			isa = PBXGroup;
+			children = (
+				4EDC8A23A6E8B8B222B70963 /* SmartNoteWidget.swift */,
+				179EC56AF6A7201A594A0308 /* Info.plist */,
+				49ADAD86483A7759E001AB43 /* SmartNoteWidget.entitlements */,
+			);
+			name = SmartNoteWidget;
+			path = SmartNoteWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		38805FF93DDF775417BFE1D5 /* SmartNoteWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C37A3E7C643876846AAEEDE4 /* Build configuration list for PBXNativeTarget "SmartNoteWidget" */;
+			buildPhases = (
+				EDC79C61CA4F0AF762EDC825 /* Sources */,
+				7D20AEC3327D681279625B3E /* Frameworks */,
+				318CFC35244146E92D830D64 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SmartNoteWidget;
+			productName = SmartNoteWidget;
+			productReference = 5A93EB3639D867820042910B /* SmartNoteWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		504EC3031FED79650016851F /* App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 504EC3161FED79650016851F /* Build configuration list for PBXNativeTarget "App" */;
@@ -115,10 +197,12 @@
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
 				9592DBEFFC6D2A0C8D5DEB22 /* [CP] Embed Pods Frameworks */,
+				C55B868337A5DDDBA8FBCFF3 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				6A4372E39CBB15B78FA6148C /* PBXTargetDependency */,
 			);
 			name = App;
 			productName = App;
@@ -155,11 +239,19 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				38805FF93DDF775417BFE1D5 /* SmartNoteWidget */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		318CFC35244146E92D830D64 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3021FED79650016851F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -220,10 +312,28 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9EA37FDB148E9A35C52D5621 /* NZRecorderPlugin.swift in Sources */,
 				F943B4FA9258814B7AE8CCB4 /* MainViewController.swift in Sources */,
+				E8042F8C114D71C4EB126BE4 /* NZWidgetPlugin.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EDC79C61CA4F0AF762EDC825 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C5D6B1CFBE2C5E74FFCD350F /* SmartNoteWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6A4372E39CBB15B78FA6148C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = SmartNoteWidget;
+			target = 38805FF93DDF775417BFE1D5 /* SmartNoteWidget */;
+			targetProxy = 81FE42B34E954B9D093FCD87 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -359,12 +469,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = 4YHU85TDWS;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.7.4;
+				MARKETING_VERSION = 1.7.5;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.getsmartnote.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -381,17 +491,62 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = 4YHU85TDWS;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.7.4;
+				MARKETING_VERSION = 1.7.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.getsmartnote.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D14FC863B346EAC91E7E368D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = SmartNoteWidget/SmartNoteWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = 4YHU85TDWS;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SmartNoteWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.7.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.getsmartnote.app.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D30DFA4C140D69ED250221F0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = SmartNoteWidget/SmartNoteWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = 4YHU85TDWS;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SmartNoteWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.7.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.getsmartnote.app.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
@@ -412,6 +567,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C37A3E7C643876846AAEEDE4 /* Build configuration list for PBXNativeTarget "SmartNoteWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D30DFA4C140D69ED250221F0 /* Release */,
+				D14FC863B346EAC91E7E368D /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
