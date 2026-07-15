@@ -385,7 +385,7 @@ function agendaRow(n, d, askDone) {
       <div class="agenda-title">${escapeHtml(n.title) || t('untitled')}</div>
       ${sub ? `<div class="agenda-sub">${escapeHtml(sub)}</div>` : ''}
     </div>
-    ${n.share && n.share.code && n.rsvp && Object.keys(n.rsvp).length ? `<span class="agenda-rsvp">✓${Object.values(n.rsvp).filter((r) => r.v === 'yes').length}</span>` : ''}
+    ${RSVP_ENABLED && n.share && n.share.code && n.rsvp && Object.keys(n.rsvp).length ? `<span class="agenda-rsvp">✓${Object.values(n.rsvp).filter((r) => r.v === 'yes').length}</span>` : ''}
     ${n.share && n.share.code ? '<span class="agenda-share">🔗</span>' : ''}
     ${askDone ? `<button class="agenda-done-btn" title="${t('markDone')}">✓</button>` : ''}`;
   li.onclick = () => openNote(n.id);
@@ -1062,10 +1062,13 @@ function updateSimpleNoteUI(note) {
 }
 
 // ---- "Wer ist dabei?" – Zusagen bei geteilten Terminen ----
+// Vorerst deaktiviert (auf Wunsch) – auf true stellen, um es zu aktivieren.
+const RSVP_ENABLED = false;
+
 function renderRsvp(note) {
   const box = $('rsvpBox');
   if (!box) return;
-  const show = !!(note && note.when && note.share && note.share.code);
+  const show = RSVP_ENABLED && !!(note && note.when && note.share && note.share.code);
   box.classList.toggle('hidden', !show);
   if (!show) return;
   const me = NZDevice.getId();
