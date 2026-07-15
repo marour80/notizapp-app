@@ -508,6 +508,7 @@
 		D14FC863B346EAC91E7E368D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = SmartNoteWidget/SmartNoteWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -530,6 +531,7 @@
 		D30DFA4C140D69ED250221F0 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = SmartNoteWidget/SmartNoteWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
