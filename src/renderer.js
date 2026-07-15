@@ -200,16 +200,16 @@ function scheduleReminderRefresh() {
 
 async function rescheduleReminders() {
   if (!(window.NZNative && NZNative.remindersAvailable && NZNative.remindersAvailable())) return;
-  if (!remOn()) {
-    NZNative.replaceReminders([]);
-    return;
-  }
+  // Kein Früh-Aus bei "global aus": Notizen mit EIGENEN Zeiten erinnern trotzdem (haben Prio).
   const now = Date.now();
   const items = [];
-  const leads = remLeads();
   (data.notes || []).forEach((n) => {
     const d = whenDate(n);
     if (!d || n.termDone) return;
+    // Individuelle Zeiten der Notiz haben Vorrang vor der globalen Einstellung.
+    const custom = Array.isArray(n.remLeads) && n.remLeads.length ? n.remLeads : null;
+    if (!custom && !remOn()) return;
+    const leads = custom || remLeads();
     leads.forEach((lead) => {
       const at = d.getTime() - lead * 60000;
       if (at <= now) return;
@@ -938,6 +938,17 @@ function updateSimpleNoteUI(note) {
   const val = note.when ? (String(note.when).includes('T') ? String(note.when).slice(0, 16) : note.when + 'T09:00') : '';
   if (wi.value !== val) wi.value = val;
   $('whenClear').classList.toggle('hidden', !note.when);
+  // Erinnerungs-Zeile nur bei Terminen: eigene Zeiten oder Standard.
+  const remRow = $('noteRemRow');
+  if (remRow) {
+    remRow.classList.toggle('hidden', !note.when);
+    if (note.when) {
+      const custom = Array.isArray(note.remLeads) && note.remLeads.length ? note.remLeads : null;
+      $('noteRemVal').textContent = custom
+        ? REM_LEADS.filter((o) => custom.includes(o.min)).map((o) => t(o.key + 'Short')).join(' · ')
+        : t('remStandard') + ' (' + reminderSummary() + ')';
+    }
+  }
 }
 
 function renderSubtasks() {
@@ -2442,7 +2453,7 @@ $('whenInput').onchange = () => {
   const note = currentNote();
   if (!note) return;
   note.when = $('whenInput').value || null;
-  $('whenClear').classList.toggle('hidden', !note.when);
+  updateSimpleNoteUI(note); // Erinnerungs-Zeile + ✕ mitziehen
   scheduleSave();
 };
 $('whenClear').onclick = () => {
@@ -2451,7 +2462,12 @@ $('whenClear').onclick = () => {
   note.when = null;
   $('whenInput').value = '';
   $('whenClear').classList.add('hidden');
+  $('noteRemRow').classList.add('hidden');
   scheduleSave();
+};
+$('noteRemRow').onclick = () => {
+  const note = currentNote();
+  if (note && note.when) openReminderModal(note);
 };
 
 $('searchInput').oninput = (e) => {
@@ -2666,11 +2682,11 @@ document.querySelectorAll('#bottomNav .bnav-item').forEach((btn) => {
   btn.onclick = () => {
     const nav = btn.dataset.nav;
     if (nav === 'notes') {
-      document.body.classList.remove('editor-open', 'search-open', 'termine-open');
+      document.body.classList.remove('editor-open', 'search-open', 'termine-open', 'settings-open');
       setNav(false);
       setActiveTab('notes');
     } else if (nav === 'termine') {
-      document.body.classList.remove('editor-open', 'search-open');
+      document.body.classList.remove('editor-open', 'search-open', 'settings-open');
       renderTermine();
       document.body.classList.add('termine-open');
       setNav(false);
@@ -2680,6 +2696,7 @@ document.querySelectorAll('#bottomNav .bnav-item').forEach((btn) => {
       if (fb && !fb.classList.contains('hidden')) fb.click();
       else $('joinBtn').click();
     } else if (nav === 'search') {
+      document.body.classList.remove('termine-open', 'settings-open');
       const on = document.body.classList.toggle('search-open');
       setActiveTab(on ? 'search' : 'notes');
       if (on) setTimeout(() => { const s = $('searchInput'); if (s) s.focus(); }, 60);
@@ -2697,42 +2714,86 @@ function reminderSummary() {
   return labels.length ? labels.join(' · ') : t('off');
 }
 
+// Das Modal arbeitet in zwei Modi: global (aus den Einstellungen) oder pro Termin
+// (aus dem Editor). Pro-Termin-Zeiten (note.remLeads) haben Vorrang vor der globalen Einstellung.
+let remModalNote = null; // null = globaler Modus
+
 function renderReminderModal() {
   const tgl = $('reminderToggle');
-  tgl.classList.toggle('on', remOn());
-  tgl.setAttribute('aria-checked', remOn() ? 'true' : 'false');
   const box = $('reminderChips');
   box.innerHTML = '';
-  const leads = remLeads();
-  REM_LEADS.forEach((o) => {
-    const b = document.createElement('button');
-    b.className = 'rchip' + (leads.includes(o.min) ? ' on' : '');
-    b.textContent = t(o.key);
-    b.onclick = () => {
-      let cur = remLeads();
-      if (cur.includes(o.min)) cur = cur.filter((x) => x !== o.min);
-      else cur.push(o.min);
-      localStorage.setItem('nz_rem_leads', JSON.stringify(cur));
-      renderReminderModal();
-      scheduleReminderRefresh();
-    };
-    box.appendChild(b);
-  });
-  box.classList.toggle('dimmed', !remOn());
+  if (remModalNote) {
+    // Pro-Termin: Switch = "Standardeinstellung verwenden"
+    const usingDefault = !(Array.isArray(remModalNote.remLeads) && remModalNote.remLeads.length);
+    $('reminderToggleLbl').textContent = t('useDefault');
+    tgl.classList.toggle('on', usingDefault);
+    tgl.setAttribute('aria-checked', usingDefault ? 'true' : 'false');
+    const leads = usingDefault ? (remOn() ? remLeads() : []) : remModalNote.remLeads;
+    REM_LEADS.forEach((o) => {
+      const b = document.createElement('button');
+      b.className = 'rchip' + (leads.includes(o.min) ? ' on' : '');
+      b.textContent = t(o.key);
+      b.onclick = () => {
+        if (usingDefault) return; // erst den Standard-Schalter ausschalten
+        let cur = remModalNote.remLeads || [];
+        if (cur.includes(o.min)) cur = cur.filter((x) => x !== o.min);
+        else cur = [...cur, o.min];
+        remModalNote.remLeads = cur;
+        remModalNote.updatedAt = Date.now();
+        persist();
+        renderReminderModal();
+      };
+      box.appendChild(b);
+    });
+    box.classList.toggle('dimmed', usingDefault);
+  } else {
+    $('reminderToggleLbl').textContent = t('remindersOn');
+    tgl.classList.toggle('on', remOn());
+    tgl.setAttribute('aria-checked', remOn() ? 'true' : 'false');
+    const leads = remLeads();
+    REM_LEADS.forEach((o) => {
+      const b = document.createElement('button');
+      b.className = 'rchip' + (leads.includes(o.min) ? ' on' : '');
+      b.textContent = t(o.key);
+      b.onclick = () => {
+        let cur = remLeads();
+        if (cur.includes(o.min)) cur = cur.filter((x) => x !== o.min);
+        else cur.push(o.min);
+        localStorage.setItem('nz_rem_leads', JSON.stringify(cur));
+        renderReminderModal();
+        scheduleReminderRefresh();
+      };
+      box.appendChild(b);
+    });
+    box.classList.toggle('dimmed', !remOn());
+  }
 }
 
-function openReminderModal() {
+function openReminderModal(note) {
+  remModalNote = note || null;
   renderReminderModal();
   $('reminderPermHint').classList.add('hidden');
   $('reminderModal').classList.remove('hidden');
 }
 
-$('setReminderRow').onclick = openReminderModal;
+$('setReminderRow').onclick = () => openReminderModal();
 $('reminderClose').onclick = () => {
   $('reminderModal').classList.add('hidden');
   if ($('setReminderVal')) $('setReminderVal').textContent = reminderSummary();
+  if (remModalNote) updateSimpleNoteUI(currentNote());
+  remModalNote = null;
 };
 $('reminderToggle').onclick = async () => {
+  if (remModalNote) {
+    // Pro-Termin: Standard verwenden <-> eigene Zeiten
+    const usingDefault = !(Array.isArray(remModalNote.remLeads) && remModalNote.remLeads.length);
+    if (usingDefault) remModalNote.remLeads = remOn() ? [...remLeads()] : [60];
+    else remModalNote.remLeads = null;
+    remModalNote.updatedAt = Date.now();
+    persist();
+    renderReminderModal();
+    return;
+  }
   const turningOn = !remOn();
   localStorage.setItem('nz_rem_on', turningOn ? '1' : '0');
   if (turningOn && window.NZNative && NZNative.requestReminderPermission) {
@@ -2752,6 +2813,10 @@ function openSettings() {
     const lang = (window.NZI18N && typeof NZI18N.lang === 'function') ? NZI18N.lang() : (document.documentElement.lang || 'de');
     $('setLangVal').textContent = String(lang).toUpperCase();
   }
+  // Profil-Karte: Name + Avatar-Initiale + E-Mail/@username
+  const nick = (window.NZDevice && NZDevice.getProfile().nickname) || '';
+  if ($('setPName')) $('setPName').textContent = nick || t('untitled');
+  if ($('setAvatar')) $('setAvatar').textContent = (nick.trim()[0] || '?').toUpperCase();
   if ($('setAccountSub')) {
     const acc = $('accountBtn');
     const email = (acc && acc._email) || '';
@@ -2766,14 +2831,15 @@ function openSettings() {
     }
   }
   if ($('setVersion') && $('appVersion')) $('setVersion').textContent = $('appVersion').textContent;
-  $('settingsModal').classList.remove('hidden');
+  // Vollbild-Screen einblenden (wie Termine-Tab)
+  document.body.classList.remove('editor-open', 'search-open', 'termine-open');
+  document.body.classList.add('settings-open');
+  setActiveTab('settings');
 }
-function closeSettings() { $('settingsModal').classList.add('hidden'); }
-$('settingsClose').onclick = closeSettings;
-$('settingsModal').onclick = (e) => { if (e.target === $('settingsModal')) closeSettings(); };
+function closeSettings() { document.body.classList.remove('settings-open'); }
 $('setThemeRow').onclick = () => { $('themeToggle').click(); openSettings(); };
 $('setLangRow').onclick = () => { if ($('langToggle')) $('langToggle').click(); openSettings(); };
-$('setAccountRow').onclick = () => { closeSettings(); $('accountBtn').click(); };
+$('setAccountRow').onclick = () => { $('accountBtn').click(); };
 
 // ---- Suche schließen / Tastatur wegtippen ----
 if ($('searchClose')) $('searchClose').onclick = () => {

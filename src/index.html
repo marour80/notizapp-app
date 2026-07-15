@@ -169,6 +169,10 @@
           <input id="whenInput" type="datetime-local" class="when-input" />
           <button id="whenClear" class="when-clear hidden" data-i18n-title="whenClear" title="Termin entfernen">✕</button>
         </div>
+        <button id="noteRemRow" class="note-rem-row hidden">
+          <span class="nrr-main">⏰ <span id="noteRemVal"></span></span>
+          <span class="sset-chev">›</span>
+        </button>
 
         <textarea id="bodyInput" class="body-input hidden" data-i18n-ph="bodyPlaceholder" placeholder="Notiz-Text…" rows="4"></textarea>
 
@@ -210,31 +214,34 @@
 
   <!-- Teilen-Dialog -->
   <!-- Einstellungen -->
-  <div id="settingsModal" class="modal-overlay hidden">
-    <div class="modal">
-      <button class="modal-close" id="settingsClose">✕</button>
-      <h2>⚙️ Einstellungen</h2>
-      <div class="settings-list">
-        <button id="setThemeRow" class="setting-row">
-          <span class="setting-label">🌗 Design</span>
-          <span id="setThemeVal" class="setting-val"></span>
+  <!-- Einstellungen: Vollbild-Screen (Glass-Stil) -->
+  <div id="settingsScreen" class="settings-screen">
+    <div class="sset-scroll">
+      <h2 class="sset-title" data-i18n="settingsTitle">Einstellungen</h2>
+
+      <div class="set-sec-label" data-i18n="secProfile">Profil</div>
+      <button id="setAccountRow" class="sset-card sset-profile">
+        <span id="setAvatar" class="sset-avatar">?</span>
+        <span class="sset-pmain">
+          <span id="setPName" class="sset-pname"></span>
+          <span id="setAccountSub" class="sset-psub"></span>
+        </span>
+        <span class="sset-chev">›</span>
+      </button>
+
+      <div class="set-sec-label" data-i18n="secPrefs">Einstellungen</div>
+      <div class="sset-card sset-group">
+        <button id="setThemeRow" class="sset-row">
+          <span class="sset-ic">🌙</span><span class="sset-lbl">Design</span><span id="setThemeVal" class="sset-pill"></span>
         </button>
-        <button id="setLangRow" class="setting-row">
-          <span class="setting-label">🌐 Sprache</span>
-          <span id="setLangVal" class="setting-val"></span>
+        <button id="setLangRow" class="sset-row">
+          <span class="sset-ic">🌐</span><span class="sset-lbl" data-i18n="langLabel">Sprache</span><span id="setLangVal" class="sset-pill"></span>
         </button>
-        <button id="setReminderRow" class="setting-row">
-          <span class="setting-label">⏰ <span data-i18n="reminders">Termin-Erinnerungen</span></span>
-          <span id="setReminderVal" class="setting-val"></span>
-        </button>
-        <button id="setAccountRow" class="setting-row setting-account">
-          <span class="setting-acc">
-            <span class="acc-title">👤 Konto &amp; Name</span>
-            <span id="setAccountSub" class="acc-sub"></span>
-          </span>
-          <span class="setting-arrow">›</span>
+        <button id="setReminderRow" class="sset-row">
+          <span class="sset-ic">⏰</span><span class="sset-lbl" data-i18n="reminders">Termin-Erinnerungen</span><span id="setReminderVal" class="sset-val"></span><span class="sset-chev">›</span>
         </button>
       </div>
+
       <div id="setVersion" class="settings-version"></div>
     </div>
   </div>
@@ -245,7 +252,7 @@
       <button class="modal-close" id="reminderClose">✕</button>
       <h2>⏰ <span data-i18n="reminders">Termin-Erinnerungen</span></h2>
       <div class="reminder-toggle-row">
-        <span data-i18n="remindersOn">Erinnerungen aktiv</span>
+        <span id="reminderToggleLbl" data-i18n="remindersOn">Erinnerungen aktiv</span>
         <button id="reminderToggle" class="switch" role="switch" aria-checked="true"><span class="knob"></span></button>
       </div>
       <p class="modal-hint" data-i18n="remindersHint">Wann sollen wir dich vor einem Termin erinnern? (Mehrfachauswahl)</p>

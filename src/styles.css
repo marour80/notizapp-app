@@ -1165,6 +1165,120 @@ body:not(.termine-open) .termine-screen { display: none; }
 }
 .agenda-done-btn:active { background: var(--ok, #3ad17a); color: #06231e; }
 
+/* ---- Einstellungen: Vollbild-Screen (Glass-Stil, wie Termine-Tab) ---- */
+.settings-screen {
+  position: fixed;
+  inset: 0;
+  bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  background:
+    radial-gradient(600px 420px at 110% -10%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
+    var(--bg);
+  z-index: 48;
+  overflow: hidden;
+}
+body:not(.settings-open) .settings-screen { display: none; }
+.sset-scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px 24px;
+}
+.sset-title { font-size: 22px; font-weight: 800; margin: 2px 2px 16px; }
+.set-sec-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin: 18px 6px 8px;
+}
+.sset-card {
+  width: 100%;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  text-align: left;
+}
+.sset-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  cursor: pointer;
+}
+.sset-avatar {
+  flex: 0 0 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #2a9d8f);
+  color: #06231e;
+  font-size: 22px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sset-pmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.sset-pname { font-size: 16.5px; font-weight: 800; }
+.sset-psub {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sset-chev { color: var(--text-faint); font-size: 18px; }
+.sset-group { overflow: hidden; padding: 0; }
+.sset-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 16px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.sset-row:last-child { border-bottom: none; }
+.sset-row:active { background: rgba(255, 255, 255, 0.04); }
+.sset-ic { font-size: 17px; }
+.sset-lbl { flex: 1; font-size: 14.5px; font-weight: 600; }
+.sset-pill {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 20px;
+  padding: 4px 12px;
+}
+.sset-val { font-size: 12.5px; font-weight: 600; color: var(--accent); }
+
+/* Editor: Erinnerungs-Zeile pro Termin */
+.note-rem-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.note-rem-row .nrr-main { color: var(--text); }
+
 /* ---- Termin-Erinnerungen: Dialog ---- */
 .reminder-toggle-row {
   display: flex;
