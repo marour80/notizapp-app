@@ -165,8 +165,9 @@
         </div>
 
         <div id="whenRow" class="when-row hidden">
-          <span id="whenLabel">📅</span>
-          <button id="whenClear" class="when-clear" data-i18n-title="whenClear" title="Termin entfernen">✕</button>
+          <span class="when-ic">📅</span>
+          <input id="whenInput" type="datetime-local" class="when-input" />
+          <button id="whenClear" class="when-clear hidden" data-i18n-title="whenClear" title="Termin entfernen">✕</button>
         </div>
 
         <textarea id="bodyInput" class="body-input hidden" data-i18n-ph="bodyPlaceholder" placeholder="Notiz-Text…" rows="4"></textarea>
@@ -200,6 +201,10 @@
     <div id="termineEmpty" class="termine-empty hidden">
       <span class="te-icon">🗓️</span>
       <p data-i18n="agendaEmpty">Noch keine Termine – sprich einfach einen ein! 🎤</p>
+    </div>
+    <div class="termine-fabs">
+      <button id="termineVoiceBtn" class="tfab tfab-voice" data-i18n-title="voiceNoteTitle" data-i18n-aria="voiceNoteTitle" title="Sprachnotiz aufnehmen" aria-label="Sprachnotiz aufnehmen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/></svg></button>
+      <button id="termineAddBtn" class="tfab tfab-add" data-i18n-title="newTermin" data-i18n-aria="newTermin" title="Neuer Termin" aria-label="Neuer Termin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
     </div>
   </div>
 

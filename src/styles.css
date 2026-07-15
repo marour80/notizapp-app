@@ -1048,6 +1048,29 @@ body:not(.termine-open) .termine-screen { display: none; }
   padding: 0 30px;
 }
 .termine-empty .te-icon { font-size: 44px; }
+.termine-fabs {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.tfab {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+}
+.tfab svg { width: 24px; height: 24px; }
+.tfab-add { background: var(--accent); color: #06231e; }
+.tfab-voice { background: var(--bg-3); color: var(--accent); border: 1px solid var(--border); width: 48px; height: 48px; }
+.tfab:active { transform: scale(0.92); }
 
 /* ---- Agenda: Termin-Notizen als eigene Sektion ---- */
 .agenda-wrap { list-style: none; }
@@ -1153,6 +1176,18 @@ body:not(.termine-open) .termine-screen { display: none; }
   color: var(--accent);
   font-weight: 600;
 }
+.when-input {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  padding: 6px 10px;
+  color-scheme: dark;
+}
+.when-input:focus { outline: none; border-color: var(--accent); }
+[data-theme='light'] .when-input { color-scheme: light; }
 .when-clear {
   background: none;
   border: none;

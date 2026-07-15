@@ -298,6 +298,22 @@ function renderAgenda(dated, withHead) {
   return wrap;
 }
 
+// Neuen Termin manuell anlegen: Notiz mit vorbelegtem Datum (nächste volle Stunde),
+// Editor öffnet über dem Termine-Screen – Titel eintippen, Datum ggf. anpassen, fertig.
+function newTermin() {
+  const d = new Date();
+  d.setHours(d.getHours() + 1, 0, 0, 0);
+  const p = (x) => String(x).padStart(2, '0');
+  const when = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':00';
+  const note = NZ.makeNote({ title: '', body: '' });
+  note.when = when;
+  data.notes.unshift(note);
+  persist();
+  renderAll();
+  openNote(note.id);
+  titleInput.focus();
+}
+
 // Termine-Tab: alle Notizen mit Termin (ordnerübergreifend), gruppiert wie die Agenda.
 function renderTermine() {
   const listEl = $('termineList');
@@ -584,7 +600,8 @@ function scheduleSave() {
 function isEmptyNote(n) {
   if (!n) return false;
   if (n.share && n.share.code) return false; // geteilte Notizen nie automatisch löschen
-  return !(n.title || '').trim() && !(n.body || '').trim() && !(n.subtasks || []).length && !n.when;
+  // Ein Datum allein zählt nicht als Inhalt – ein Termin ohne Titel/Text ist wertlos.
+  return !(n.title || '').trim() && !(n.body || '').trim() && !(n.subtasks || []).length;
 }
 
 // Leere Notiz beim Verlassen verwerfen (Plus gedrückt, nichts eingegeben, zurück).
@@ -827,12 +844,12 @@ function updateSimpleNoteUI(note) {
   const showBody = !!(note.body || liveSubs.length === 0);
   bodyEl.classList.toggle('hidden', !showBody);
   if (bodyEl.value !== (note.body || '')) bodyEl.value = note.body || '';
-  if (note.when) {
-    $('whenLabel').textContent = '📅 ' + formatWhen(note.when);
-    whenRow.classList.remove('hidden');
-  } else {
-    whenRow.classList.add('hidden');
-  }
+  // Datum-Zeile immer anbieten → jede Notiz kann manuell zum Termin werden.
+  whenRow.classList.remove('hidden');
+  const wi = $('whenInput');
+  const val = note.when ? (String(note.when).includes('T') ? String(note.when).slice(0, 16) : note.when + 'T09:00') : '';
+  if (wi.value !== val) wi.value = val;
+  $('whenClear').classList.toggle('hidden', !note.when);
 }
 
 function renderSubtasks() {
@@ -2307,6 +2324,8 @@ $('voiceConfirmBtn').onclick = confirmVoice;
 $('voiceAdjustBtn').onclick = adjustVoice;
 $('voiceClose').onclick = closeVoice;
 $('voiceAnswerOk').onclick = closeVoice;
+$('termineAddBtn').onclick = newTermin;
+$('termineVoiceBtn').onclick = () => startVoice();
 $('voiceAnswerAgain').onclick = () => {
   voiceDraft = null; // neue Frage, kein Anpassungs-Kontext
   beginRecording();
@@ -2331,11 +2350,19 @@ if ($('langToggle')) $('langToggle').onclick = toggleLanguage;
 titleInput.oninput = scheduleSave;
 folderSelect.onchange = scheduleSave;
 $('bodyInput').oninput = scheduleSave;
+$('whenInput').onchange = () => {
+  const note = currentNote();
+  if (!note) return;
+  note.when = $('whenInput').value || null;
+  $('whenClear').classList.toggle('hidden', !note.when);
+  scheduleSave();
+};
 $('whenClear').onclick = () => {
   const note = currentNote();
   if (!note) return;
   note.when = null;
-  $('whenRow').classList.add('hidden');
+  $('whenInput').value = '';
+  $('whenClear').classList.add('hidden');
   scheduleSave();
 };
 
