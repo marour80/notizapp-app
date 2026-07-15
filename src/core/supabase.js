@@ -448,6 +448,7 @@
     available: () => !!(global.NZ_CONFIG && global.NZ_CONFIG.AI),
     generate: (prompt) => aiInvoke('generate', prompt),
     sort: (items) => aiInvoke('sort', { items }),
+    photo: (dataUrl, lang, now) => aiInvoke('photo', { dataUrl, lang, now }),
     voice: (formData) => aiVoice(formData)
   };
 

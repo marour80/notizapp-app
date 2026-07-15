@@ -161,6 +161,55 @@ async function generate(client: any, prompt: string, isVoice = false, context: a
   return JSON.parse(textFrom(res));
 }
 
+// Foto lesen (Rezept, Einkaufszettel, Tafel, Notiz) → Liste oder Notiztext.
+async function readPhoto(client: any, dataUrl: string, lang: string | null, now: string | null) {
+  const m = /^data:(image\/[a-z+.-]+);base64,(.+)$/i.exec(dataUrl || '');
+  if (!m) throw new Error('Ungültiges Bild (erwartet data:image/...;base64).');
+  const mediaType = m[1].toLowerCase() === 'image/jpg' ? 'image/jpeg' : m[1].toLowerCase();
+  const b64 = m[2];
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      intent: { type: 'string', enum: ['list', 'note'] },
+      title: { type: 'string' },
+      items: { type: 'array', items: { type: 'string' } },
+      body: { type: 'string' },
+      when: { type: 'string' },
+      summary: { type: 'string' }
+    },
+    required: ['intent', 'title', 'items', 'body', 'when', 'summary']
+  };
+  const res = await client.messages.create({
+    model: MODEL_GENERATE,
+    max_tokens: 2000,
+    system:
+      'Du liest den Inhalt eines FOTOS für eine Notiz-App aus (z. B. Rezept aus einem Kochbuch, handgeschriebener Einkaufszettel, Tafel/Whiteboard, Etikett, Plakat mit Termin).\n' +
+      '• Enthält das Bild eine LISTE oder ein Rezept → intent="list": kurzer Titel + die Punkte als "items" (Zutaten MIT Mengen, wenn angegeben). Handschrift so gut wie möglich entziffern.\n' +
+      '• Ist es eher Fließtext/eine Info/ein Termin → intent="note": Titel + Inhalt in "body"; steht ein Datum/eine Uhrzeit darauf, rechne sie mithilfe von JETZT in ein ISO-Datum um ("when", z. B. "2026-07-20T19:00"), sonst "when" leer.\n' +
+      'ANTWORTSPRACHE: die Sprache des Nutzers (APP-SPRACHE), unabhängig von der Sprache auf dem Foto.\n' +
+      '"summary": 1 kurzer freundlicher Satz, was du erkannt hast (wird dem Nutzer zur Bestätigung gezeigt). ' +
+      'Ist auf dem Foto nichts Verwertbares zu erkennen, sag das ehrlich in "summary" und lass den Rest leer.',
+    output_config: { format: { type: 'json_schema', schema } },
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } },
+          {
+            type: 'text',
+            text:
+              (now ? 'JETZT: ' + now + '\n' : '') +
+              'APP-SPRACHE: ' + (lang === 'en' ? 'Englisch' : 'Deutsch') + '\n' +
+              'Lies das Foto aus und gib das Ergebnis strukturiert zurück.'
+          }
+        ]
+      }
+    ]
+  });
+  return JSON.parse(textFrom(res));
+}
+
 async function sortItems(client: any, items: string[]) {
   const schema = {
     type: 'object',
@@ -236,6 +285,7 @@ Deno.serve(async (req) => {
       }
       return json(await generate(client, String(input || '')));
     }
+    if (mode === 'photo') return json(await readPhoto(client, String((input && input.dataUrl) || ''), (input && input.lang) || null, (input && input.now) || null));
     if (mode === 'sort') return json(await sortItems(client, (input && input.items) || []));
     return json({ error: 'Unbekannter Modus' }, 400);
   } catch (e) {

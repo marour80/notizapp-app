@@ -665,6 +665,7 @@ function showFillChoice(noteId) {
   const note = data.notes.find((n) => n.id === noteId);
   $('fillChoiceTitle').textContent = (note && note.title) || t('newList');
   $('fillChoiceVoice').classList.toggle('hidden', !aiAvailable()); // ohne KI keine Sprachfüllung
+  $('fillChoicePhoto').classList.toggle('hidden', !(aiAvailable() && window.NZNative && NZNative.cameraAvailable && NZNative.cameraAvailable()));
   $('fillChoiceModal').classList.remove('hidden');
 }
 function closeFillChoice() {
@@ -679,6 +680,52 @@ function fillChoiceVoice() {
 function fillChoiceType() {
   closeFillChoice();
   focusSubAdd();
+}
+
+// Foto → Liste: Foto aufnehmen, KI liest den Inhalt, Vorschau wie bei der Sprachnotiz.
+async function fillChoicePhoto() {
+  const id = fillChoiceNoteId;
+  closeFillChoice();
+  let dataUrl = null;
+  try {
+    dataUrl = await NZNative.takePhoto({
+      header: t('fillPhoto'),
+      camera: t('photoTake'),
+      gallery: t('photoGallery'),
+      cancel: t('cancel')
+    });
+  } catch (e) {
+    return; // abgebrochen oder keine Kamera
+  }
+  if (!dataUrl) return;
+  // Verarbeitung im Voice-Modal anzeigen (gleiche Bestätigungs-UI wie bei Sprache)
+  voiceTargetId = id || null;
+  voiceDraft = null;
+  $('voiceError').classList.add('hidden');
+  $('voiceRecording').classList.add('hidden');
+  $('voiceConfirm').classList.add('hidden');
+  $('voiceAnswer').classList.add('hidden');
+  $('voiceProcessing').classList.remove('hidden');
+  $('voiceModal').classList.remove('hidden');
+  try {
+    const res = await NZAI.photo(dataUrl, (window.NZI18N && NZI18N.lang) || 'de', new Date().toString());
+    voiceDraft = {
+      intent: res.intent === 'note' ? 'note' : 'list',
+      title: res.title || '',
+      items: res.items || [],
+      body: res.body || '',
+      when: res.when || '',
+      answer: '',
+      spoken: '',
+      matchedIds: [],
+      shareWith: '',
+      summary: res.summary || ''
+    };
+    showVoiceConfirm(voiceDraft);
+  } catch (e) {
+    $('voiceProcessing').classList.add('hidden');
+    showVoiceError(t('errGeneric') + (e.message || e));
+  }
 }
 
 // Eingabefeld fokussieren, OHNE dass iOS den Bildschirm hochscrollt (Leiste unter die Statusleiste).
@@ -2488,6 +2535,7 @@ document.querySelectorAll('#emptyList .tpl-tile').forEach((b) => {
   b.onclick = () => startTemplate(b.dataset.tpl);
 });
 $('fillChoiceVoice').onclick = fillChoiceVoice;
+$('fillChoicePhoto').onclick = fillChoicePhoto;
 $('fillChoiceType').onclick = fillChoiceType;
 $('fillChoiceClose').onclick = closeFillChoice;
 $('fillChoiceModal').addEventListener('click', (e) => {
