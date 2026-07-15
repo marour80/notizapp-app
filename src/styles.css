@@ -1279,6 +1279,37 @@ body:not(.settings-open) .settings-screen { display: none; }
 }
 .note-rem-row .nrr-main { color: var(--text); }
 
+/* "Wer ist dabei?" – Zusagen bei geteilten Terminen */
+.rsvp-box {
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.rsvp-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.rsvp-btns { display: flex; gap: 8px; }
+.rsvp-btn {
+  flex: 1;
+  padding: 9px 0;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rsvp-btn.rsvp-yes.on { background: color-mix(in srgb, var(--ok, #3ad17a) 20%, transparent); border-color: var(--ok, #3ad17a); color: var(--ok, #3ad17a); }
+.rsvp-btn.rsvp-no.on { background: color-mix(in srgb, #ff5c72 18%, transparent); border-color: #ff5c72; color: #ff5c72; }
+.rsvp-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.rsvp-list:empty { margin-top: 0; }
+.rsvp-chip { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 14px; }
+.rsvp-chip.yes { background: color-mix(in srgb, var(--ok, #3ad17a) 16%, transparent); color: var(--ok, #3ad17a); }
+.rsvp-chip.no { background: color-mix(in srgb, #ff5c72 14%, transparent); color: #ff5c72; }
+.agenda-rsvp { flex: 0 0 auto; font-size: 12px; font-weight: 800; color: var(--ok, #3ad17a); }
+
 /* ---- Termin-Erinnerungen: Dialog ---- */
 .reminder-toggle-row {
   display: flex;

@@ -375,6 +375,7 @@ function agendaRow(n, d, askDone) {
       <div class="agenda-title">${escapeHtml(n.title) || t('untitled')}</div>
       ${sub ? `<div class="agenda-sub">${escapeHtml(sub)}</div>` : ''}
     </div>
+    ${n.share && n.share.code && n.rsvp && Object.keys(n.rsvp).length ? `<span class="agenda-rsvp">✓${Object.values(n.rsvp).filter((r) => r.v === 'yes').length}</span>` : ''}
     ${n.share && n.share.code ? '<span class="agenda-share">🔗</span>' : ''}
     ${askDone ? `<button class="agenda-done-btn" title="${t('markDone')}">✓</button>` : ''}`;
   li.onclick = () => openNote(n.id);
@@ -1047,6 +1048,43 @@ function updateSimpleNoteUI(note) {
         : t('remStandard') + ' (' + reminderSummary() + ')';
     }
   }
+  renderRsvp(note);
+}
+
+// ---- "Wer ist dabei?" – Zusagen bei geteilten Terminen ----
+function renderRsvp(note) {
+  const box = $('rsvpBox');
+  if (!box) return;
+  const show = !!(note && note.when && note.share && note.share.code);
+  box.classList.toggle('hidden', !show);
+  if (!show) return;
+  const me = NZDevice.getId();
+  const mine = note.rsvp && note.rsvp[me] ? note.rsvp[me].v : null;
+  $('rsvpYes').classList.toggle('on', mine === 'yes');
+  $('rsvpNo').classList.toggle('on', mine === 'no');
+  const list = $('rsvpList');
+  list.innerHTML = '';
+  const entries = Object.values(note.rsvp || {}).sort((a, b) => (a.at || 0) - (b.at || 0));
+  entries.forEach((r) => {
+    const chip = document.createElement('span');
+    chip.className = 'rsvp-chip ' + (r.v === 'yes' ? 'yes' : 'no');
+    chip.textContent = (r.v === 'yes' ? '✓ ' : '✗ ') + (r.name || '?');
+    list.appendChild(chip);
+  });
+}
+
+function setRsvp(v) {
+  const note = currentNote();
+  if (!note) return;
+  if (!note.rsvp) note.rsvp = {};
+  const me = NZDevice.me();
+  const cur = note.rsvp[me.id];
+  if (cur && cur.v === v) delete note.rsvp[me.id]; // nochmal tippen = Antwort zurückziehen
+  else note.rsvp[me.id] = { v, name: me.nickname, at: Date.now() };
+  note.updatedAt = Date.now();
+  persist();
+  renderRsvp(note);
+  renderTermine();
 }
 
 function renderSubtasks() {
@@ -2568,6 +2606,8 @@ $('noteRemRow').onclick = () => {
   const note = currentNote();
   if (note && note.when) openReminderModal(note);
 };
+$('rsvpYes').onclick = () => setRsvp('yes');
+$('rsvpNo').onclick = () => setRsvp('no');
 
 $('searchInput').oninput = (e) => {
   searchTerm = e.target.value;

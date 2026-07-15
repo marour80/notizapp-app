@@ -156,9 +156,22 @@ Deno.serve(async (req) => {
       (actorCand[0] && actorCand[0].updatedBy && actorCand[0].updatedBy.nickname) ||
       'Jemand';
     const addedSubtask = subs.length > oldSubs.length;
-    const bodyText = addedSubtask
-      ? `${who} hat eine Teilaufgabe zu „${title}" hinzugefügt.`
-      : `${who} hat „${title}" aktualisiert.`;
+    // "Wer ist dabei?": Zusage/Absage erkannt → schönere Nachricht.
+    let rsvpMsg: string | null = null;
+    const newR = (note.data && note.data.rsvp) || {};
+    const oldR = (oldNote.data && oldNote.data.rsvp) || {};
+    for (const k of Object.keys(newR)) {
+      const nv = newR[k];
+      const ov = oldR[k];
+      if (nv && (!ov || ov.v !== nv.v)) {
+        rsvpMsg = (nv.name || who) + (nv.v === 'yes' ? ` ist dabei! ✅ – „${title}"` : ` hat abgesagt ❌ – „${title}"`);
+      }
+    }
+    const bodyText = rsvpMsg
+      ? rsvpMsg
+      : addedSubtask
+        ? `${who} hat eine Teilaufgabe zu „${title}" hinzugefügt.`
+        : `${who} hat „${title}" aktualisiert.`;
     console.log('notify: noteId=' + noteId + ' share_code=' + (note.share_code || '-') + ' actor=' + (actor || '-') + ' who=' + who + ' added=' + addedSubtask);
     // Nur geteilte Notizen sind relevant (sonst gibt es ohnehin keine Mitglieder).
     if (!noteId || !note.share_code) {
