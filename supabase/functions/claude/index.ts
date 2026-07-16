@@ -88,7 +88,7 @@ async function generate(client: any, prompt: string, isVoice = false, context: a
     type: 'object',
     additionalProperties: false,
     properties: {
-      intent: { type: 'string', enum: ['list', 'note', 'query'] },
+      intent: { type: 'string', enum: ['list', 'note', 'query', 'edit'] },
       title: { type: 'string' },
       items: { type: 'array', items: { type: 'string' } },
       body: { type: 'string' },
@@ -96,10 +96,11 @@ async function generate(client: any, prompt: string, isVoice = false, context: a
       answer: { type: 'string' },
       spoken: { type: 'string' },
       matchedIds: { type: 'array', items: { type: 'string' } },
+      targetId: { type: 'string' },
       shareWith: { type: 'string' },
       summary: { type: 'string' }
     },
-    required: ['intent', 'title', 'items', 'body', 'when', 'answer', 'spoken', 'matchedIds', 'shareWith', 'summary']
+    required: ['intent', 'title', 'items', 'body', 'when', 'answer', 'spoken', 'matchedIds', 'targetId', 'shareWith', 'summary']
   };
   let userContent = '';
   if (now) userContent += 'JETZT (aktuelles Datum/Uhrzeit des Nutzers): ' + now + '\n';
@@ -127,6 +128,12 @@ async function generate(client: any, prompt: string, isVoice = false, context: a
       '• "note" – der Nutzer will EINE einfache Notiz/Info/Termin festhalten, OHNE Teilaufgaben (z. B. "Padel am Montag um 16 Uhr in der Halle mit Marvin", "WLAN-Passwort ist …", "Reifen wechseln nicht vergessen"). ' +
       'Fülle dann: "title" = kurzer prägnanter Titel, "body" = die vollständige Info in 1–3 Sätzen, "items" = LEER. ' +
       '"when": Wird ein Datum/eine Uhrzeit genannt, rechne sie mithilfe von JETZT in ein absolutes Datum um und gib es als ISO-String zurück (z. B. "2026-07-15T20:00"); ohne Uhrzeit nur das Datum ("2026-07-15"); ohne Zeitangabe leer lassen.\n' +
+      '• "edit" – der Nutzer will einen BESTEHENDEN Termin oder eine bestehende Notiz ÄNDERN ("der Termin von morgen soll eine Stunde früher sein", "verschieb das Padel auf Freitag 19 Uhr", "benenne die Einkaufsliste um in Wochenendeinkauf"). ' +
+      'Finde die gemeinte Notiz in den VORHANDENEN NOTIZEN und trage ihre id in "targetId" ein. ' +
+      'Berechne die NEUEN Werte aus den alten (z. B. "eine Stunde früher" bei when=2026-07-16T20:00 → "2026-07-16T19:00"; relative Angaben mit JETZT auflösen). ' +
+      'Fülle NUR die Felder, die sich ändern ("when" neues ISO-Datum, "title" neuer Titel, "body" neuer Text) – unveränderte Felder LEER lassen. "items" immer leer. ' +
+      '"summary": Bestätigungssatz mit ALT → NEU, z. B. "Ich verschiebe „Padel mit Patrick" von Mi., 20:00 auf Mi., 19:00 – passt das?". ' +
+      'Findest du keine passende Notiz, nimm stattdessen intent="query" mit answer="Diesen Termin habe ich in deinen Notizen nicht gefunden."\n' +
       '• "query" – der Nutzer FRAGT etwas über seine vorhandenen Notizen ("Wann ist mein nächstes Padel-Spiel?", "Habe ich am Mittwoch was vor?", "Was steht auf der Einkaufsliste?"). ' +
       'Beantworte die Frage NUR anhand der mitgelieferten VORHANDENEN NOTIZEN in "answer" – kurz, freundlich, konkret (nenne Datum/Uhrzeit/Ort, rechne Datumsangaben mit JETZT um, z. B. "morgen"). ' +
       'Trage die ids der passenden Notizen in "matchedIds" ein. Findest du nichts Passendes, sag das ehrlich in "answer" ("Dazu habe ich nichts in deinen Notizen gefunden."). ' +

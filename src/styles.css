@@ -1883,7 +1883,8 @@ body:not(.settings-open) .settings-screen { display: none; }
     position: fixed;
     left: 0; right: 0; bottom: 0;
     z-index: 58;
-    height: 60px;
+    /* border-box: Safe-Area-Padding braucht eigene Höhe, sonst rutschen die Labels auf die Home-Linie */
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: rgba(7, 15, 22, 0.94);
     border-top: 1px solid var(--glass-border);

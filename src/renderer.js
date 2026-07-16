@@ -2438,6 +2438,7 @@ async function processVoice(blob) {
       answer: res.answer || '',
       spoken: res.spoken || '',
       matchedIds: res.matchedIds || [],
+      targetId: res.targetId || '',
       shareWith: (res.shareWith || '').trim(),
       summary: res.summary || ''
     };
@@ -2479,23 +2480,26 @@ function showVoiceConfirm(draft) {
   $('voiceProcessing').classList.add('hidden');
   $('voiceRecording').classList.add('hidden');
   $('voiceSummary').textContent = draft.summary || '';
-  $('voicePreviewTitle').textContent = draft.title || t('newList');
   const isNote = draft.intent === 'note';
-  $('voicePreviewItems').innerHTML = isNote ? '' : (draft.items || []).map((it) => `<li>${escapeHtml(it)}</li>`).join('');
+  const isEdit = draft.intent === 'edit';
+  const target = isEdit ? data.notes.find((n) => n.id === draft.targetId) : null;
+  $('voicePreviewTitle').textContent = draft.title || (target && target.title) || t('newList');
+  $('voicePreviewItems').innerHTML = isNote || isEdit ? '' : (draft.items || []).map((it) => `<li>${escapeHtml(it)}</li>`).join('');
   const bodyEl = $('voicePreviewBody');
-  if (isNote && draft.body) {
+  if ((isNote || isEdit) && draft.body) {
     bodyEl.textContent = draft.body;
     bodyEl.classList.remove('hidden');
   } else {
     bodyEl.classList.add('hidden');
   }
   const whenEl = $('voicePreviewWhen');
-  if (isNote && draft.when) {
+  if ((isNote || isEdit) && draft.when) {
     whenEl.textContent = '📅 ' + formatWhen(draft.when);
     whenEl.classList.remove('hidden');
   } else {
     whenEl.classList.add('hidden');
   }
+  $('voiceConfirmBtn').textContent = isEdit ? t('voiceConfirmEdit') : t('voiceConfirm');
   const shareEl = $('voicePreviewShare');
   if (draft.shareWith) {
     shareEl.textContent = '🔗 ' + t('voiceShareLine', { who: draft.shareWith });
@@ -2549,6 +2553,27 @@ function confirmVoice() {
   const draft = voiceDraft;
   if (!draft) return;
   $('voiceModal').classList.add('hidden');
+  if (draft.intent === 'edit') {
+    // Bestehenden Termin/Notiz ändern – nur die Felder, die die KI neu geliefert hat.
+    const target = data.notes.find((n) => n.id === draft.targetId);
+    if (target) {
+      if (draft.when) target.when = draft.when;
+      if (draft.title) target.title = draft.title;
+      if (draft.body) target.body = draft.body;
+      target.termDone = false; // verschobener Termin ist wieder "offen"
+      target.updatedAt = Date.now();
+      persist();
+      renderAll();
+      if (target.when) {
+        renderTermine();
+        document.body.classList.remove('editor-open', 'search-open');
+        document.body.classList.add('termine-open');
+        setActiveTab('termine');
+      }
+    }
+    voiceDraft = null;
+    return;
+  }
   if (draft.intent === 'note') {
     createSimpleNoteFromAI(draft.title, draft.body, draft.when);
   } else if (voiceTargetId && data.notes.find((n) => n.id === voiceTargetId)) {
