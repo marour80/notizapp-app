@@ -255,7 +255,7 @@
     }
   }
   // Ersetzt ALLE geplanten Erinnerungen durch die übergebene Liste
-  // items: [{ id:int, title, body, at:Date }]
+  // items: [{ id:int, title, body, at:Date, actionTypeId?, extra? }]
   async function replaceReminders(items) {
     const LN = plugin('LocalNotifications');
     if (!LN) return false;
@@ -267,19 +267,53 @@
     if (!items || !items.length) return true;
     try {
       await LN.schedule({
-        notifications: items.map((it) => ({
-          id: it.id,
-          title: it.title,
-          body: it.body,
-          schedule: { at: it.at },
-          sound: 'default'
-        }))
+        notifications: items.map((it) => {
+          const n = {
+            id: it.id,
+            title: it.title,
+            body: it.body,
+            schedule: { at: it.at },
+            sound: 'default'
+          };
+          if (it.actionTypeId) n.actionTypeId = it.actionTypeId;
+          if (it.extra) n.extra = it.extra;
+          return n;
+        })
       });
       return true;
     } catch (e) {
       console.warn('[Reminder] schedule fehlgeschlagen:', e);
       return false;
     }
+  }
+
+  // Interaktive "Termin vorbei – erledigt?"-Benachrichtigung: registriert die
+  // Aktions-Buttons und meldet Antworten (auch aus dem Hintergrund) an onAction.
+  async function initTermActions(labels, onAction) {
+    const LN = plugin('LocalNotifications');
+    if (!LN) return false;
+    try {
+      await LN.registerActionTypes({
+        types: [
+          {
+            id: 'TERM_DONE',
+            actions: [
+              { id: 'done', title: labels.done },
+              { id: 'keep', title: labels.keep }
+            ]
+          }
+        ]
+      });
+    } catch (e) {
+      console.warn('[Reminder] registerActionTypes:', e);
+    }
+    try {
+      LN.addListener('localNotificationActionPerformed', (ev) => {
+        const noteId = ev && ev.notification && ev.notification.extra && ev.notification.extra.noteId;
+        if (onAction) onAction(ev.actionId, noteId);
+      });
+    } catch {}
+    return true;
   }
 
   // ---- Homescreen-Widget: Termin-Daten in die App Group schieben ----
@@ -314,5 +348,5 @@
     });
   }
 
-  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, updateWidget, parseCode, plugin, initKeyboard };
+  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, initTermActions, updateWidget, parseCode, plugin, initKeyboard };
 })(typeof window !== 'undefined' ? window : globalThis);

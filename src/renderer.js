@@ -86,6 +86,30 @@ function notifyShared(info) {
   applyTheme(theme);
   renderAll();
   scheduleReminderRefresh(); // geplante Termin-Erinnerungen an den aktuellen Stand angleichen
+
+  // "Termin vorbei – erledigt?"-Buttons: Antwort verarbeiten (kommt auch aus dem Hintergrund).
+  if (window.NZNative && NZNative.initTermActions) {
+    NZNative.initTermActions(
+      { done: t('actionDone'), keep: t('actionKeep') },
+      (actionId, noteId) => {
+        if (!noteId) return;
+        const note = data.notes.find((n) => n.id === noteId);
+        if (!note) return;
+        if (actionId === 'done') {
+          note.termDone = true; // ab nach "Vergangen" – ganz ohne App-Besuch
+          note.updatedAt = Date.now();
+          persist();
+          renderAll();
+        } else if (actionId === 'tap') {
+          // Auf die Nachricht selbst getippt → App öffnet den Termine-Tab
+          renderTermine();
+          document.body.classList.remove('editor-open', 'search-open', 'settings-open');
+          document.body.classList.add('termine-open');
+          setActiveTab('termine');
+        }
+      }
+    );
+  }
 })();
 
 // ---- Sprache anwenden / umschalten ----
@@ -222,6 +246,28 @@ async function rescheduleReminders() {
       });
     });
   });
+
+  // ---- "Termin vorbei – erledigt?"-Nachfrage mit Aktions-Buttons ----
+  // Kommt nach dem Termin (mit Uhrzeit: +90 Min., ohne: um 20 Uhr desselben Tags).
+  // "✓ Erledigt" verschiebt den Termin nach Vergangen, ohne die App zu öffnen.
+  if (remOn()) {
+    (data.notes || []).forEach((n) => {
+      const d = whenDate(n);
+      if (!d || n.termDone) return;
+      const askAt = new Date(d.getTime());
+      if (String(n.when).includes('T')) askAt.setMinutes(askAt.getMinutes() + 90);
+      else askAt.setHours(20, 0, 0, 0);
+      if (askAt.getTime() <= now) return;
+      items.push({
+        id: remId(n.id, 999983),
+        title: t('termOverTitle'),
+        body: t('termOverBody', { title: n.title || t('untitled') }),
+        at: askAt,
+        actionTypeId: 'TERM_DONE',
+        extra: { noteId: n.id }
+      });
+    });
+  }
 
   // ---- Morgen-Briefing: die nächsten 7 Tage vorausplanen (wird bei jedem Sync aktualisiert) ----
   if (briefOn()) {
