@@ -1900,13 +1900,19 @@ body:not(.settings-open) .settings-screen { display: none; }
   /* Alt-Knöpfe ausblenden – alles über Einstellungen erreichbar (wie auf dem iPhone) */
   #joinBtn, #friendsBtn, #accountBtn, .bottom-row { display: none; }
 
-  /* Termine/Einstellungen laufen neben der Seitenleiste (statt Vollbild über allem) */
-  .termine-screen, .settings-screen { left: 240px; bottom: 0; }
-  /* Termin angetippt → Editor zeigt die Notiz (Overlay weicht) */
-  body.editor-open .termine-screen { display: none; }
-  /* Inhalte auf großen Flächen mittig begrenzen statt volle Breite */
-  .termine-head, .termine-list { max-width: 860px; width: 100%; margin-left: auto; margin-right: auto; }
-  .sset-scroll { max-width: 640px; margin: 0 auto; }
+  /* Termine = gleiches Muster wie Notizen: Agenda als mittlere Spalte, Inhalt rechts im Editor.
+     Der Screen legt sich exakt über die Listen-Spalte (240px Sidebar + 300px Spalte). */
+  .termine-screen {
+    left: 240px;
+    right: auto;
+    width: 300px;
+    bottom: 0;
+    border-right: 1px solid var(--border);
+    padding: 16px 12px 10px;
+  }
+  /* Einstellungen: Seite neben der Seitenleiste, links ausgerichtet (nicht mittig schwebend) */
+  .settings-screen { left: 240px; bottom: 0; }
+  .sset-scroll { max-width: 640px; margin: 0; padding-left: 28px; padding-right: 28px; }
 }
 
 @media (max-width: 760px) {

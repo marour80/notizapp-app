@@ -376,6 +376,9 @@ function renderFolders() {
     li.innerHTML = `<span class="ficon">${it.icon}</span><span>${escapeHtml(it.label)}</span><span class="fcount">${count}</span>`;
     li.onclick = () => {
       currentFolder = it.key;
+      // Ordner-Klick = Notizen-Ansicht (falls gerade Termine/Einstellungen/Suche offen sind)
+      document.body.classList.remove('termine-open', 'settings-open', 'search-open');
+      setActiveTab('notes');
       renderAll();
     };
     if (it.key !== '__all__') {
