@@ -256,6 +256,14 @@
     await c.from('note_members').delete().eq('note_id', noteId).eq('member', uid);
   }
 
+  // Eine einzelne Notiz frisch aus der Cloud holen (Polling-Fallback für offene
+  // geteilte Notizen – Realtime verwirft Events mit großen Fotos still).
+  async function fetchNote(noteId) {
+    const c = await ensureClient();
+    const { data } = await c.from('notes').select('id, owner, data, share_code, updated_at').eq('id', noteId).maybeSingle();
+    return data || null;
+  }
+
   // Push-Token dieses Geräts in der Cloud speichern (für native Benachrichtigungen).
   // Token wird lokal gemerkt, damit er nach einem Identitätswechsel (Login/Logout)
   // unter der NEUEN uid erneut gespeichert werden kann – sonst pushen wir ins Leere.
@@ -553,6 +561,7 @@
     joinByCode,
     unshareNote,
     leaveNote,
+    fetchNote,
     joinPresence,
     savePushToken
   };

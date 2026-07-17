@@ -796,6 +796,46 @@ function focusSubAdd() {
   }
 }
 
+// ---- Polling-Fallback für offene geteilte Notizen ----
+// Realtime verwirft Events still, wenn die Notiz groß ist (z.B. Teilaufgaben-Fotos).
+// Deshalb: solange eine geteilte Notiz offen ist, alle 6s frisch aus der Cloud holen.
+let sharedPollTimer = null;
+
+function stopSharedPoll() {
+  if (sharedPollTimer) {
+    clearInterval(sharedPollTimer);
+    sharedPollTimer = null;
+  }
+}
+
+function startSharedPoll(noteId) {
+  stopSharedPoll();
+  if (!(window.NZShare && NZShare.fetchNote)) return;
+  sharedPollTimer = setInterval(async () => {
+    const note = currentNote();
+    if (!note || note.id !== noteId || !(note.share && note.share.code)) {
+      stopSharedPoll();
+      return;
+    }
+    // Nicht reinpfuschen, während hier gerade getippt wird.
+    const ae = document.activeElement;
+    if (ae && (ae.classList.contains('sub-text') || ae.id === 'titleInput' || ae.id === 'bodyInput')) return;
+    try {
+      const row = await NZShare.fetchNote(noteId);
+      const remote = row && row.data;
+      if (!remote || (remote.updatedAt || 0) <= (note.updatedAt || 0)) return;
+      ['title', 'body', 'subtasks', 'when', 'termDone', 'rsvp', 'status', 'pinned', 'folder'].forEach((k) => {
+        if (remote[k] !== undefined) note[k] = remote[k];
+      });
+      note.updatedAt = remote.updatedAt;
+      if (document.activeElement !== titleInput) titleInput.value = note.title || '';
+      renderSubtasks();
+      updateSharedBadge(note);
+      renderNoteList();
+    } catch {}
+  }, 6000);
+}
+
 function openNote(id) {
   const note = data.notes.find((n) => n.id === id);
   if (!note) return;
@@ -803,6 +843,8 @@ function openNote(id) {
   // Wechsel von einer leeren Notiz weg → die leere verwerfen.
   if (activeNoteId && activeNoteId !== id) discardIfEmpty(activeNoteId);
   activeNoteId = id;
+  if (note.share && note.share.code) startSharedPoll(id);
+  else stopSharedPoll();
   doneGroupOpen = false; // erledigte Teilaufgaben starten zugeklappt
   document.body.classList.add('editor-open'); // Handy: Editor-Ebene einblenden
   setNav(false);
@@ -861,6 +903,7 @@ function discardIfEmpty(noteId) {
 function closeEditor() {
   const wasActive = activeNoteId;
   activeNoteId = null;
+  stopSharedPoll();
   leavePresence();
   editorEl.classList.add('hidden');
   editorEmptyEl.classList.remove('hidden');
@@ -2530,7 +2573,8 @@ function showVoiceConfirm(draft) {
   const isEdit = draft.intent === 'edit';
   const target = isEdit ? data.notes.find((n) => n.id === draft.targetId) : null;
   $('voicePreviewTitle').textContent = draft.title || (target && target.title) || t('newList');
-  $('voicePreviewItems').innerHTML = isNote || isEdit ? '' : (draft.items || []).map((it) => `<li>${escapeHtml(it)}</li>`).join('');
+  // Bei "edit" sind items die NEU hinzuzufügenden Punkte – auch anzeigen.
+  $('voicePreviewItems').innerHTML = isNote ? '' : (draft.items || []).map((it) => `<li>${escapeHtml(it)}</li>`).join('');
   const bodyEl = $('voicePreviewBody');
   if ((isNote || isEdit) && draft.body) {
     bodyEl.textContent = draft.body;
@@ -2606,11 +2650,20 @@ function confirmVoice() {
       if (draft.when) target.when = draft.when;
       if (draft.title) target.title = draft.title;
       if (draft.body) target.body = draft.body;
-      target.termDone = false; // verschobener Termin ist wieder "offen"
+      // Neue Teilaufgaben anhängen ("füge Butter zur Einkaufsliste hinzu")
+      const addedItems = (draft.items || []).filter((s) => s && s.trim());
+      if (addedItems.length) {
+        if (!target.subtasks) target.subtasks = [];
+        addedItems.forEach((s) => target.subtasks.push(NZ.makeSubtask(s, NZDevice.me())));
+        applyAutoStatus(target);
+      }
+      target.termDone = false; // geänderter Termin ist wieder "offen"
       target.updatedAt = Date.now();
       persist();
       renderAll();
-      if (target.when) {
+      if (addedItems.length) {
+        openNote(target.id); // direkt zeigen, was dazugekommen ist
+      } else if (target.when) {
         renderTermine();
         document.body.classList.remove('editor-open', 'search-open');
         document.body.classList.add('termine-open');
@@ -2772,6 +2825,19 @@ if (window.NZNative && NZNative.isNative()) {
     $('joinInput').value = code;
     doJoin();
   });
+
+  // Widget-Tipps: Sperrbildschirm-Widget → direkt Sprachaufnahme, Homescreen-Widget → Termine-Tab.
+  if (NZNative.onAppRoute) {
+    NZNative.onAppRoute({
+      voice: () => NZStore.ready.then(() => startVoice()),
+      termine: () => NZStore.ready.then(() => {
+        renderTermine();
+        document.body.classList.remove('editor-open', 'search-open', 'settings-open');
+        document.body.classList.add('termine-open');
+        setActiveTab('termine');
+      })
+    });
+  }
 
   // Push registrieren – ABER nur wenn Firebase eingerichtet ist (sonst nativer Absturz).
   if (window.NZ_CONFIG && NZ_CONFIG.PUSH) {

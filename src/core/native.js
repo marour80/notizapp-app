@@ -25,13 +25,35 @@
     return /login-callback/i.test(url || '');
   }
 
+  // App-interne Routen (z.B. vom Widget): smartnote://voice, smartnote://termine
+  function isRouteUrl(url) {
+    return /:\/\/(voice|termine)/i.test(url || '');
+  }
+
+  // Widget-Tipps & Co.: smartnote://voice → Sprachaufnahme, smartnote://termine → Termine-Tab.
+  function onAppRoute(routes) {
+    const App = plugin('App');
+    if (!App) return;
+    const route = (url) => {
+      if (!url) return;
+      if (/:\/\/voice/i.test(url) && routes.voice) routes.voice();
+      else if (/:\/\/termine/i.test(url) && routes.termine) routes.termine();
+    };
+    App.addListener('appUrlOpen', (d) => route(d && d.url));
+    if (App.getLaunchUrl) {
+      App.getLaunchUrl()
+        .then((r) => route(r && r.url))
+        .catch(() => {});
+    }
+  }
+
   // Tiefen-Link: smartnote://join?code=XXX → ruft handler(code). Login-Rückleitung wird ignoriert.
   function onDeepLink(handler) {
     const App = plugin('App');
     if (!App) return;
     App.addListener('appUrlOpen', (data) => {
       const url = (data && data.url) || '';
-      if (isAuthCallback(url)) return; // OAuth → onAuthCallback
+      if (isAuthCallback(url) || isRouteUrl(url)) return; // OAuth → onAuthCallback, Routen → onAppRoute
       const code = parseCode(url);
       if (code) handler(code);
     });
@@ -39,7 +61,7 @@
     if (App.getLaunchUrl) {
       App.getLaunchUrl()
         .then((res) => {
-          if (res && res.url && !isAuthCallback(res.url)) {
+          if (res && res.url && !isAuthCallback(res.url) && !isRouteUrl(res.url)) {
             const c = parseCode(res.url);
             if (c) handler(c);
           }
@@ -348,5 +370,5 @@
     });
   }
 
-  global.NZNative = { isNative, onDeepLink, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, initTermActions, updateWidget, parseCode, plugin, initKeyboard };
+  global.NZNative = { isNative, onDeepLink, onAppRoute, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, initTermActions, updateWidget, parseCode, plugin, initKeyboard };
 })(typeof window !== 'undefined' ? window : globalThis);

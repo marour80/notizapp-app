@@ -184,25 +184,34 @@ struct WidgetRootView: View {
     let entry: TerminEntry
     @Environment(\.widgetFamily) var family
     var body: some View {
+        // Tipp aufs Sperrbildschirm-Widget → direkt die Sprachaufnahme öffnen;
+        // Homescreen-Widget → Termine-Tab. (Face ID entsperrt dabei automatisch.)
         if #available(iOSApplicationExtension 16.0, *), family == .accessoryRectangular {
             if #available(iOSApplicationExtension 17.0, *) {
-                AccessoryRectView(entry: entry).containerBackground(for: .widget) { Color.clear }
-            } else {
                 AccessoryRectView(entry: entry)
+                    .widgetURL(URL(string: "smartnote://voice"))
+                    .containerBackground(for: .widget) { Color.clear }
+            } else {
+                AccessoryRectView(entry: entry).widgetURL(URL(string: "smartnote://voice"))
             }
         } else if #available(iOSApplicationExtension 16.0, *), family == .accessoryInline {
             if #available(iOSApplicationExtension 17.0, *) {
-                AccessoryInlineView(entry: entry).containerBackground(for: .widget) { Color.clear }
-            } else {
                 AccessoryInlineView(entry: entry)
+                    .widgetURL(URL(string: "smartnote://voice"))
+                    .containerBackground(for: .widget) { Color.clear }
+            } else {
+                AccessoryInlineView(entry: entry).widgetURL(URL(string: "smartnote://voice"))
             }
         } else {
             if #available(iOSApplicationExtension 17.0, *) {
-                TermineView(entry: entry).containerBackground(for: .widget) { bgColor }
+                TermineView(entry: entry)
+                    .widgetURL(URL(string: "smartnote://termine"))
+                    .containerBackground(for: .widget) { bgColor }
             } else {
                 TermineView(entry: entry)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(bgColor)
+                    .widgetURL(URL(string: "smartnote://termine"))
             }
         }
     }

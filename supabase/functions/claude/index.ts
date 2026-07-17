@@ -131,7 +131,8 @@ async function generate(client: any, prompt: string, isVoice = false, context: a
       '• "edit" – der Nutzer will einen BESTEHENDEN Termin oder eine bestehende Notiz ÄNDERN ("der Termin von morgen soll eine Stunde früher sein", "verschieb das Padel auf Freitag 19 Uhr", "benenne die Einkaufsliste um in Wochenendeinkauf"). ' +
       'Finde die gemeinte Notiz in den VORHANDENEN NOTIZEN und trage ihre id in "targetId" ein. ' +
       'Berechne die NEUEN Werte aus den alten (z. B. "eine Stunde früher" bei when=2026-07-16T20:00 → "2026-07-16T19:00"; relative Angaben mit JETZT auflösen). ' +
-      'Fülle NUR die Felder, die sich ändern ("when" neues ISO-Datum, "title" neuer Titel, "body" neuer Text) – unveränderte Felder LEER lassen. "items" immer leer. ' +
+      'Fülle NUR die Felder, die sich ändern ("when" neues ISO-Datum, "title" neuer Titel, "body" neuer Text) – unveränderte Felder LEER lassen. ' +
+      'Will der Nutzer PUNKTE/TEILAUFGABEN HINZUFÜGEN ("füge Butter und Eier zur Einkaufsliste hinzu"): trage NUR die NEUEN Punkte in "items" ein (bestehende NICHT wiederholen) und lass when/title/body leer, außer sie ändern sich auch. Sonst "items" leer. ' +
       '"summary": Bestätigungssatz mit ALT → NEU, z. B. "Ich verschiebe „Padel mit Patrick" von Mi., 20:00 auf Mi., 19:00 – passt das?". ' +
       'Findest du keine passende Notiz, nimm stattdessen intent="query" mit answer="Diesen Termin habe ich in deinen Notizen nicht gefunden."\n' +
       '• "query" – der Nutzer FRAGT etwas über seine vorhandenen Notizen ("Wann ist mein nächstes Padel-Spiel?", "Habe ich am Mittwoch was vor?", "Was steht auf der Einkaufsliste?"). ' +
