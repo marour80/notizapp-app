@@ -42,6 +42,26 @@
         🎤 <span data-i18n="voiceNote">Sprachnotiz</span>
       </button>
 
+      <!-- Breite Screens (Tablet/Desktop): gleiche Tabs wie die mobile Bottom-Nav -->
+      <nav class="side-nav">
+        <button class="side-nav-item active" data-nav="notes">
+          <span class="snav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span>
+          <span class="bnav-lbl">Notizen</span>
+        </button>
+        <button class="side-nav-item" data-nav="termine">
+          <span class="snav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg></span>
+          <span class="bnav-lbl">Termine</span>
+        </button>
+        <button class="side-nav-item" data-nav="friends">
+          <span class="snav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><path d="M16 5.3a3 3 0 0 1 0 5.4"/><path d="M17.6 14.7c1.9.7 3.4 2.6 3.4 5.3"/></svg></span>
+          <span class="bnav-lbl">Freunde</span>
+        </button>
+        <button class="side-nav-item" data-nav="settings">
+          <span class="snav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.6v3.1M12 18.3v3.1M2.6 12h3.1M18.3 12h3.1M5.2 5.2l2.2 2.2M16.6 16.6l2.2 2.2M18.8 5.2l-2.2 2.2M7.4 16.6l-2.2 2.2"/></svg></span>
+          <span class="bnav-lbl">Einstellungen</span>
+        </button>
+      </nav>
+
       <nav class="folders">
         <div class="folders-head">
           <span data-i18n="folders">Ordner</span>

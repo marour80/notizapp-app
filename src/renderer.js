@@ -2899,9 +2899,9 @@ function setNav(open) {
 }
 // ---- Bottom-Navigation (mobil) – ersetzt das ☰-Menü ----
 function setActiveTab(name) {
-  document.querySelectorAll('#bottomNav .bnav-item').forEach((b) => b.classList.toggle('active', b.dataset.nav === name));
+  document.querySelectorAll('#bottomNav .bnav-item, .side-nav .side-nav-item').forEach((b) => b.classList.toggle('active', b.dataset.nav === name));
 }
-document.querySelectorAll('#bottomNav .bnav-item').forEach((btn) => {
+document.querySelectorAll('#bottomNav .bnav-item, .side-nav .side-nav-item').forEach((btn) => {
   btn.onclick = () => {
     const nav = btn.dataset.nav;
     if (nav === 'notes') {
