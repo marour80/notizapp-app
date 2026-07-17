@@ -102,8 +102,9 @@ function notifyShared(info) {
           renderAll();
         } else if (actionId === 'tap') {
           // Auf die Nachricht selbst getippt → App öffnet den Termine-Tab
+          document.body.classList.remove('search-open', 'settings-open');
+          closeEditor(); // Editor-Spalte (Tablet) nicht mit alter Notiz stehen lassen
           renderTermine();
-          document.body.classList.remove('editor-open', 'search-open', 'settings-open');
           document.body.classList.add('termine-open');
           setActiveTab('termine');
         }
@@ -2589,8 +2590,9 @@ function createSimpleNoteFromAI(title, body, when) {
   renderAll();
   if (when) {
     // kurz den Termine-Tab zeigen, damit man sieht, wo der Termin gelandet ist
+    document.body.classList.remove('search-open');
+    closeEditor(); // Editor-Spalte (Tablet) nicht mit alter Notiz stehen lassen
     renderTermine();
-    document.body.classList.remove('editor-open', 'search-open');
     document.body.classList.add('termine-open');
     setActiveTab('termine');
   } else {
@@ -2614,8 +2616,9 @@ function confirmVoice() {
       persist();
       renderAll();
       if (target.when) {
+        document.body.classList.remove('search-open');
+        closeEditor(); // Editor-Spalte (Tablet) nicht mit alter Notiz stehen lassen
         renderTermine();
-        document.body.classList.remove('editor-open', 'search-open');
         document.body.classList.add('termine-open');
         setActiveTab('termine');
       }
@@ -2912,7 +2915,8 @@ document.querySelectorAll('#bottomNav .bnav-item, .side-nav .side-nav-item').for
       setNav(false);
       setActiveTab('notes');
     } else if (nav === 'termine') {
-      document.body.classList.remove('editor-open', 'search-open', 'settings-open');
+      document.body.classList.remove('search-open', 'settings-open');
+      closeEditor(); // rechts nicht die zuletzt offene Notiz stehen lassen (Tablet: Editor-Spalte bleibt sichtbar)
       renderTermine();
       document.body.classList.add('termine-open');
       setNav(false);

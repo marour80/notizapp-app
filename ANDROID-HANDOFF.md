@@ -1,5 +1,13 @@
 # Android-Handoff (Stand: Version 1.7.8, iOS Build 11)
 
+> **⚠️ REGEL für beide Sessions (Mac & Windows): Jedes UI-Feature muss in BEIDEN Layouts ankommen.**
+> Mobil (`max-width:760px`) = Bottom-Nav + Vollbild-Screens. Breit (`min-width:761px`) = `.side-nav`
+> in der Seitenleiste (gleiche `data-nav`-Semantik); Termine als mittlere Spalte (left:240px,
+> width:300px) + Inhalt rechts im Editor (wie Notizen); Einstellungen als Seite neben der Seitenleiste.
+> Neue Tabs/Screens immer in beiden Breiten verdrahten und im Preview bei Handy- UND Desktop-Breite
+> testen. Tab-Wechsel schließen auf breiten Screens den Editor (`closeEditor()`).
+> (Seit 1.7.9/1.7.10 umgesetzt — Windows-Session hat das Tablet ans mobile Redesign angeglichen.)
+
 Für die Claude-Session auf dem Windows-Rechner: Die iOS-Seite ist auf 1.7.8 (TestFlight).
 Dieser Stand enthält seit der letzten Android-Version SEHR viele Änderungen. Ziel:
 Android auf denselben Stand bringen und ein Play-Store-Bundle (AAB) bauen.

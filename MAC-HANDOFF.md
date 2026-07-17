@@ -1,11 +1,27 @@
-# SmartNote — iOS/Mac-Übergabe (Stand 2026-06-26, v1.6.3)
+# SmartNote — iOS/Mac-Übergabe (Basis-Infos; Versionsstand siehe `git log`)
 
 Diese Datei bringt eine **frische Claude-Code-Sitzung auf dem Mac** sofort auf Stand,
 um den iOS-Build in TestFlight / den App Store zu bringen.
-(Erstellt aus der Windows-Sitzung, in der die App entwickelt wird — dort liegt die Gesprächs-Historie.)
+(Erstellt aus der Windows-Sitzung, in der die App entwickelt wird — dort liegt die Gesprächs-Historie.
+Die Versionsangaben unten können veraltet sein — der `git log` ist die Wahrheit.)
 
 > **An Claude auf dem Mac:** Lies diese Datei komplett, dann arbeite mit dem User am iOS-Build weiter.
 > Der User sitzt am Mac und kann dir **Xcode-Screenshots direkt in die Sitzung ziehen**.
+
+## ⚠️ REGEL: Jedes UI-Feature muss in BEIDEN Layouts ankommen
+
+Es gibt EIN gemeinsames `src/` für alle Plattformen; Unterschiede laufen NUR über CSS-Breakpoints:
+- **Mobil** (`@media (max-width: 760px)`): Bottom-Nav (`#bottomNav`), Screens als Vollbild-Overlays.
+- **Breit / Tablet / Desktop** (`min-width: 761px`): `.side-nav` in der Seitenleiste (gleiche
+  `data-nav`-Semantik wie die Bottom-Nav), **Termine** liegen als mittlere Spalte exakt über der
+  Notizen-Listen-Spalte (left:240px; width:300px) und der Inhalt öffnet rechts im Editor —
+  gleiches Muster wie Notizen. Einstellungen = Seite neben der Seitenleiste.
+
+**Beim Bauen neuer Tabs/Screens/Buttons immer beide Breiten verdrahten und im Preview bei
+Handy- UND Desktop-Breite testen** — sonst driften iPhone und Tablet auseinander (ist passiert:
+das 1.7.x-Redesign war anfangs mobil-only, das Tablet zeigte noch die alte Oberfläche).
+Tab-Wechsel müssen auf breiten Screens den Editor schließen (`closeEditor()`), sonst bleibt
+rechts die zuletzt offene Notiz stehen.
 
 ---
 
