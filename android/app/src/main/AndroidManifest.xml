@@ -45,4 +45,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Exakte Termin-Erinnerungen (Android 12+); ohne diese Berechtigung fallen Alarme auf "ungefähr" zurück -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 </manifest>
