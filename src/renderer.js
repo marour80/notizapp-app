@@ -102,8 +102,9 @@ function notifyShared(info) {
           renderAll();
         } else if (actionId === 'tap') {
           // Auf die Nachricht selbst getippt → App öffnet den Termine-Tab
+          document.body.classList.remove('search-open', 'settings-open');
+          closeEditor(); // Editor-Spalte (Tablet) nicht mit alter Notiz stehen lassen
           renderTermine();
-          document.body.classList.remove('editor-open', 'search-open', 'settings-open');
           document.body.classList.add('termine-open');
           setActiveTab('termine');
         }
@@ -376,6 +377,9 @@ function renderFolders() {
     li.innerHTML = `<span class="ficon">${it.icon}</span><span>${escapeHtml(it.label)}</span><span class="fcount">${count}</span>`;
     li.onclick = () => {
       currentFolder = it.key;
+      // Ordner-Klick = Notizen-Ansicht (falls gerade Termine/Einstellungen/Suche offen sind)
+      document.body.classList.remove('termine-open', 'settings-open', 'search-open');
+      setActiveTab('notes');
       renderAll();
     };
     if (it.key !== '__all__') {
@@ -2630,8 +2634,9 @@ function createSimpleNoteFromAI(title, body, when) {
   renderAll();
   if (when) {
     // kurz den Termine-Tab zeigen, damit man sieht, wo der Termin gelandet ist
+    document.body.classList.remove('search-open');
+    closeEditor(); // Editor-Spalte (Tablet) nicht mit alter Notiz stehen lassen
     renderTermine();
-    document.body.classList.remove('editor-open', 'search-open');
     document.body.classList.add('termine-open');
     setActiveTab('termine');
   } else {
@@ -2664,8 +2669,9 @@ function confirmVoice() {
       if (addedItems.length) {
         openNote(target.id); // direkt zeigen, was dazugekommen ist
       } else if (target.when) {
+        document.body.classList.remove('search-open');
+        closeEditor(); // Editor-Spalte (Tablet) nicht mit alter Notiz stehen lassen
         renderTermine();
-        document.body.classList.remove('editor-open', 'search-open');
         document.body.classList.add('termine-open');
         setActiveTab('termine');
       }
@@ -2965,9 +2971,9 @@ function setNav(open) {
 }
 // ---- Bottom-Navigation (mobil) – ersetzt das ☰-Menü ----
 function setActiveTab(name) {
-  document.querySelectorAll('#bottomNav .bnav-item').forEach((b) => b.classList.toggle('active', b.dataset.nav === name));
+  document.querySelectorAll('#bottomNav .bnav-item, .side-nav .side-nav-item').forEach((b) => b.classList.toggle('active', b.dataset.nav === name));
 }
-document.querySelectorAll('#bottomNav .bnav-item').forEach((btn) => {
+document.querySelectorAll('#bottomNav .bnav-item, .side-nav .side-nav-item').forEach((btn) => {
   btn.onclick = () => {
     const nav = btn.dataset.nav;
     if (nav === 'notes') {
@@ -2975,7 +2981,8 @@ document.querySelectorAll('#bottomNav .bnav-item').forEach((btn) => {
       setNav(false);
       setActiveTab('notes');
     } else if (nav === 'termine') {
-      document.body.classList.remove('editor-open', 'search-open', 'settings-open');
+      document.body.classList.remove('search-open', 'settings-open');
+      closeEditor(); // rechts nicht die zuletzt offene Notiz stehen lassen (Tablet: Editor-Spalte bleibt sichtbar)
       renderTermine();
       document.body.classList.add('termine-open');
       setNav(false);
