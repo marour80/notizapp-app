@@ -1095,6 +1095,13 @@ body:not(.termine-open) .termine-screen { display: none; }
 .agenda-today .agenda-label { color: var(--accent); }
 .agenda ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .agenda-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+}
+.agenda-inner {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1103,10 +1110,25 @@ body:not(.termine-open) .termine-screen { display: none; }
   border-radius: 14px;
   padding: 10px 12px;
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: transform 0.2s ease, border-color 0.15s ease;
+  touch-action: pan-y; /* vertikal scrollen, horizontal = Wischen */
 }
-.agenda-item:active { transform: scale(0.985); }
-.agenda-item:hover { border-color: var(--accent); }
+.agenda-item.swiped .agenda-inner { transform: translateX(-72px); }
+.agenda-item.dragging .agenda-inner { transition: none; }
+.agenda-inner:hover { border-color: var(--accent); }
+.agenda-del {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 72px;
+  border: none;
+  border-radius: 0 14px 14px 0;
+  background: #e5484d;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
 .agenda-tile {
   flex: 0 0 44px;
   height: 46px;

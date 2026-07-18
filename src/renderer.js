@@ -430,15 +430,25 @@ function agendaRow(n, d, askDone) {
   const li = document.createElement('li');
   li.className = 'agenda-item' + (askDone ? ' agenda-ask' : '');
   li.innerHTML = `
-    <div class="agenda-tile"><span class="ag-wd">${escapeHtml(wd)}</span><span class="ag-day">${d.getDate()}</span></div>
-    <div class="agenda-main">
-      <div class="agenda-title">${escapeHtml(n.title) || t('untitled')}</div>
-      ${sub ? `<div class="agenda-sub">${escapeHtml(sub)}</div>` : ''}
-    </div>
-    ${RSVP_ENABLED && n.share && n.share.code && n.rsvp && Object.keys(n.rsvp).length ? `<span class="agenda-rsvp">✓${Object.values(n.rsvp).filter((r) => r.v === 'yes').length}</span>` : ''}
-    ${n.share && n.share.code ? '<span class="agenda-share">🔗</span>' : ''}
-    ${askDone ? `<button class="agenda-done-btn" title="${t('markDone')}">✓</button>` : ''}`;
-  li.onclick = () => openNote(n.id);
+    <button class="agenda-del" title="${t('delete')}" aria-label="${t('delete')}">🗑</button>
+    <div class="agenda-inner">
+      <div class="agenda-tile"><span class="ag-wd">${escapeHtml(wd)}</span><span class="ag-day">${d.getDate()}</span></div>
+      <div class="agenda-main">
+        <div class="agenda-title">${escapeHtml(n.title) || t('untitled')}</div>
+        ${sub ? `<div class="agenda-sub">${escapeHtml(sub)}</div>` : ''}
+      </div>
+      ${RSVP_ENABLED && n.share && n.share.code && n.rsvp && Object.keys(n.rsvp).length ? `<span class="agenda-rsvp">✓${Object.values(n.rsvp).filter((r) => r.v === 'yes').length}</span>` : ''}
+      ${n.share && n.share.code ? '<span class="agenda-share">🔗</span>' : ''}
+      ${askDone ? `<button class="agenda-done-btn" title="${t('markDone')}">✓</button>` : ''}
+    </div>`;
+  const inner = li.querySelector('.agenda-inner');
+  // Wischen nach links → Löschen aufdecken (wie bei den Notiz-Karten); Tipp öffnet.
+  attachSwipe(li, inner, n.id, 72);
+  li.querySelector('.agenda-del').onclick = (e) => {
+    e.stopPropagation();
+    deleteNoteById(n.id);
+    renderTermine();
+  };
   if (askDone) {
     li.querySelector('.agenda-done-btn').onclick = (e) => {
       e.stopPropagation();
@@ -608,7 +618,8 @@ function closeAllSwipes() {
   if (openSwipedCard) closeSwipe(openSwipedCard);
 }
 
-function attachSwipe(li, inner, noteId) {
+function attachSwipe(li, inner, noteId, revealPx) {
+  const reveal = revealPx || 144;
   let startX = 0;
   let startY = 0;
   let dx = 0;
@@ -640,8 +651,8 @@ function attachSwipe(li, inner, noteId) {
     }
     if (decided !== 'h') return;
     suppressClick = true;
-    const base = li.classList.contains('swiped') ? -144 : 0;
-    dx = Math.max(-158, Math.min(0, base + mx));
+    const base = li.classList.contains('swiped') ? -reveal : 0;
+    dx = Math.max(-(reveal + 14), Math.min(0, base + mx));
     inner.style.transform = 'translateX(' + dx + 'px)';
     e.preventDefault();
   });
@@ -3182,6 +3193,33 @@ $('backBtn').onclick = () => {
     renderAll();
   }
 };
+
+// Wisch von der linken Kante nach rechts → zurück (wie die iOS-Zurück-Geste).
+// Führt zur Liste bzw. zum Termine-Tab zurück, je nachdem woher man kam.
+(function initEditorBackSwipe() {
+  let sx = 0;
+  let sy = 0;
+  let tracking = false;
+  editorEl.addEventListener('pointerdown', (e) => {
+    if (!document.body.classList.contains('editor-open')) return; // nur im Handy-Overlay
+    if (e.clientX > 60) return; // nur von der linken Kante aus
+    tracking = true;
+    sx = e.clientX;
+    sy = e.clientY;
+  });
+  editorEl.addEventListener('pointermove', (e) => {
+    if (!tracking) return;
+    const dx = e.clientX - sx;
+    const dy = Math.abs(e.clientY - sy);
+    if (dx > 70 && dy < 60) {
+      tracking = false;
+      $('backBtn').click();
+    }
+  });
+  const stopTrack = () => { tracking = false; };
+  editorEl.addEventListener('pointerup', stopTrack);
+  editorEl.addEventListener('pointercancel', stopTrack);
+})();
 
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
