@@ -37,6 +37,10 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>SmartNote nutzt die Kamera fuer Fotos zu Aufgaben.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>SmartNote erinnert dich an offene Einkäufe, wenn du an einem gespeicherten Einkaufsort ankommst – auch bei geschlossener App.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>SmartNote nutzt deinen Standort, um Einkaufs-Orte zu speichern.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>SmartNote nutzt das Mikrofon fuer Sprachnotizen.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

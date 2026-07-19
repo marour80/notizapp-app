@@ -4,7 +4,7 @@
  */
 (function (global) {
   global.NZ_CONFIG = {
-    VERSION: '1.7.12', // wird in der Seitenleiste angezeigt – so erkennst du, ob ein Gerät aktuell ist
+    VERSION: '1.7.13', // wird in der Seitenleiste angezeigt – so erkennst du, ob ein Gerät aktuell ist
     SUPABASE_URL: 'https://stmdyyaaibpywpvfmuph.supabase.co',
     SUPABASE_KEY: 'sb_publishable_QRU3uPValHydnj5I54IMIw_1jpPvgnR',
     CLOUD: true, // false = nur lokal (kein Cloud-Sync)

@@ -1363,6 +1363,30 @@ body:not(.settings-open) .settings-screen { display: none; }
 }
 .switch.on { background: var(--accent); }
 .switch.on .knob { transform: translateX(20px); }
+/* Einkaufs-Orte */
+.places-list { list-style: none; margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; }
+.places-list:empty { margin-bottom: 4px; }
+.place-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.place-row .place-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.place-row .place-radius { padding: 5px 8px; font-size: 12.5px; }
+.places-perm { color: #ff9f43; }
+
 .brief-time-row {
   display: flex;
   align-items: center;

@@ -271,9 +271,24 @@
         <button id="setBriefRow" class="sset-row">
           <span class="sset-ic">☀️</span><span class="sset-lbl" data-i18n="briefing">Morgen-Briefing</span><span id="setBriefVal" class="sset-val"></span><span class="sset-chev">›</span>
         </button>
+        <button id="setPlacesRow" class="sset-row hidden">
+          <span class="sset-ic">🛒</span><span class="sset-lbl" data-i18n="places">Einkaufs-Orte</span><span id="setPlacesVal" class="sset-val"></span><span class="sset-chev">›</span>
+        </button>
       </div>
 
       <div id="setVersion" class="settings-version"></div>
+    </div>
+  </div>
+
+  <!-- Einkaufs-Orte (Geofencing) -->
+  <div id="placesModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" id="placesClose">✕</button>
+      <h2>🛒 <span data-i18n="places">Einkaufs-Orte</span></h2>
+      <p class="modal-hint" data-i18n="placesHint">Speichere Orte, an denen du einkaufst. Kommst du dort an und deine Einkaufsliste hat offene Punkte, erinnert dich SmartNote automatisch.</p>
+      <ul id="placesList" class="places-list"></ul>
+      <button id="placeAddBtn" class="primary-btn" data-i18n="placeAdd">📍 Aktuellen Standort speichern</button>
+      <p id="placesPermHint" class="modal-hint places-perm hidden" data-i18n="placesPermHint">Für Erinnerungen bei geschlossener App bitte in den iOS-Einstellungen den Standort auf „Immer" stellen.</p>
     </div>
   </div>
 

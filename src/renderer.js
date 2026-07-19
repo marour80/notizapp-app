@@ -87,6 +87,11 @@ function notifyShared(info) {
   renderAll();
   scheduleReminderRefresh(); // geplante Termin-Erinnerungen an den aktuellen Stand angleichen
 
+  // Einkaufs-Orte nach App-Start erneut beim System registrieren (robust nach Updates)
+  if (window.NZNative && NZNative.geoSetPlaces && getPlaces().length) {
+    NZNative.geoSetPlaces(getPlaces());
+  }
+
   // "Termin vorbei – erledigt?"-Buttons: Antwort verarbeiten (kommt auch aus dem Hintergrund).
   if (window.NZNative && NZNative.initTermActions) {
     NZNative.initTermActions(
@@ -311,6 +316,8 @@ async function rescheduleReminders() {
 
   NZNative.replaceReminders(items);
 
+  updateGeoSummary(); // Einkaufs-Orte: offene Punkte für die Ankunfts-Push aktualisieren
+
   // Homescreen-Widget mit den nächsten Terminen versorgen
   if (NZNative.updateWidget) {
     const widgetList = (data.notes || [])
@@ -319,6 +326,95 @@ async function rescheduleReminders() {
       .slice(0, 8)
       .map((n) => ({ id: n.id, title: n.title || t('untitled'), when: String(n.when) }));
     NZNative.updateWidget(widgetList);
+  }
+}
+
+// ---- Einkaufs-Orte (Geofencing): Erinnerung, wenn man am Laden ankommt ----
+const PLACE_RADII = [100, 150, 250, 400, 700, 1000]; // Meter – pro Ort wählbar
+
+function getPlaces() {
+  try {
+    const a = JSON.parse(localStorage.getItem('nz_places') || '[]');
+    return Array.isArray(a) ? a : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePlaces(places) {
+  localStorage.setItem('nz_places', JSON.stringify(places));
+  if (window.NZNative && NZNative.geoSetPlaces) NZNative.geoSetPlaces(places);
+  if ($('setPlacesVal')) $('setPlacesVal').textContent = placesSummary();
+}
+
+function placesSummary() {
+  const n = getPlaces().length;
+  return n ? String(n) + ' 📍' : t('off');
+}
+
+function renderPlacesModal() {
+  const list = $('placesList');
+  list.innerHTML = '';
+  getPlaces().forEach((p) => {
+    const li = document.createElement('li');
+    li.className = 'place-row';
+    li.innerHTML = `
+      <span class="place-name">📍 ${escapeHtml(p.name)}</span>
+      <select class="place-radius when-input">${PLACE_RADII.map((r) => `<option value="${r}" ${r === p.radius ? 'selected' : ''}>${r} m</option>`).join('')}</select>
+      <button class="place-del when-clear" title="${t('delete')}">✕</button>`;
+    li.querySelector('.place-radius').onchange = (e) => {
+      const places = getPlaces();
+      const me = places.find((x) => x.id === p.id);
+      if (me) me.radius = parseInt(e.target.value, 10);
+      savePlaces(places);
+    };
+    li.querySelector('.place-del').onclick = () => {
+      savePlaces(getPlaces().filter((x) => x.id !== p.id));
+      renderPlacesModal();
+    };
+    list.appendChild(li);
+  });
+}
+
+async function addPlace() {
+  const btn = $('placeAddBtn');
+  btn.disabled = true;
+  try {
+    const status = await NZNative.geoRequestPermission();
+    if (status === 'denied') {
+      $('placesPermHint').classList.remove('hidden');
+      return;
+    }
+    const pos = await NZNative.geoCurrentPosition();
+    if (!pos) return;
+    const name = (prompt(t('placeNamePrompt'), 'Rewe') || '').trim();
+    if (!name) return;
+    const places = getPlaces();
+    places.push({ id: NZ.uid(), name, lat: pos.lat, lng: pos.lng, radius: 150 });
+    savePlaces(places);
+    renderPlacesModal();
+    // "Immer erlauben" nachfordern (nötig für Erinnerungen bei geschlossener App)
+    const st = await NZNative.geoAuthStatus();
+    $('placesPermHint').classList.toggle('hidden', st === 'always');
+  } catch (e) {
+    alert(t('errGeneric') + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Offene Einkäufe für die Ankunfts-Push zusammenfassen (liest das native Plugin beim Betreten).
+function updateGeoSummary() {
+  if (!(window.NZNative && NZNative.geoSetSummary && NZNative.geoAvailable && NZNative.geoAvailable())) return;
+  const shopRe = /einkauf|shopping|shop|kauf|grocer|supermarkt|markt/i;
+  const cands = (data.notes || [])
+    .map((n) => ({ n, open: (n.subtasks || []).filter((s) => !s.deleted && (s.status || 'todo') !== 'done').length }))
+    .filter((x) => x.open > 0);
+  const match = cands.find((x) => shopRe.test(x.n.title || '')) || cands.find((x) => x.n.pinned) || null;
+  if (match) {
+    NZNative.geoSetSummary(match.open, t('placesPushBody', { n: match.open, title: match.n.title || t('untitled') }));
+  } else {
+    NZNative.geoSetSummary(0, '');
   }
 }
 
@@ -3109,6 +3205,23 @@ $('briefTime').onchange = () => {
   localStorage.setItem('nz_brief_time', $('briefTime').value || '08:00');
   scheduleReminderRefresh();
 };
+
+// ---- Einkaufs-Orte: Dialog ----
+$('setPlacesRow').onclick = async () => {
+  renderPlacesModal();
+  $('placesModal').classList.remove('hidden');
+  if (window.NZNative && NZNative.geoAuthStatus && getPlaces().length) {
+    const st = await NZNative.geoAuthStatus();
+    $('placesPermHint').classList.toggle('hidden', st === 'always');
+  } else {
+    $('placesPermHint').classList.add('hidden');
+  }
+};
+$('placesClose').onclick = () => {
+  $('placesModal').classList.add('hidden');
+  if ($('setPlacesVal')) $('setPlacesVal').textContent = placesSummary();
+};
+$('placeAddBtn').onclick = addPlace;
 $('reminderClose').onclick = () => {
   $('reminderModal').classList.add('hidden');
   if ($('setReminderVal')) $('setReminderVal').textContent = reminderSummary();
@@ -3142,6 +3255,12 @@ function openSettings() {
   if ($('setThemeVal')) $('setThemeVal').textContent = isDark ? t('themeDark') : t('themeLight');
   if ($('setReminderVal')) $('setReminderVal').textContent = reminderSummary();
   if ($('setBriefVal')) $('setBriefVal').textContent = briefSummary();
+  // Einkaufs-Orte nur zeigen, wenn das native Geo-Plugin da ist (iOS-App)
+  if ($('setPlacesRow')) {
+    const geoOk = !!(window.NZNative && NZNative.geoAvailable && NZNative.geoAvailable());
+    $('setPlacesRow').classList.toggle('hidden', !geoOk);
+    if (geoOk && $('setPlacesVal')) $('setPlacesVal').textContent = placesSummary();
+  }
   if ($('setLangVal')) {
     const lang = (window.NZI18N && typeof NZI18N.lang === 'function') ? NZI18N.lang() : (document.documentElement.lang || 'de');
     $('setLangVal').textContent = String(lang).toUpperCase();
