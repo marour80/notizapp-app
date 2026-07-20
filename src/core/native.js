@@ -378,11 +378,11 @@
       return false;
     }
   }
-  async function geoSetSummary(count, body) {
+  async function geoSetSummary(count, body, map) {
     const G = plugin('NZGeo');
     if (!G) return false;
     try {
-      await G.setSummary({ count: count || 0, body: body || '' });
+      await G.setSummary({ count: count || 0, body: body || '', map: map || {} });
       return true;
     } catch {
       return false;

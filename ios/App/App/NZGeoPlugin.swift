@@ -116,16 +116,30 @@ public class NZGeoPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegate
     }
 
     // Von der App gepflegte Zusammenfassung ("6 Punkte offen auf „Einkauf"").
+    // map = { placeId: {count, body} } für Ort-spezifische Punkte (haben Vorrang).
     @objc func setSummary(_ call: CAPPluginCall) {
         UserDefaults.standard.set(call.getInt("count") ?? 0, forKey: "nz_geo_count")
         UserDefaults.standard.set(call.getString("body") ?? "", forKey: "nz_geo_body")
+        if let map = call.getObject("map") {
+            UserDefaults.standard.set(map, forKey: "nz_geo_map")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "nz_geo_map")
+        }
         call.resolve(["ok": true])
     }
 
     // Ort betreten → wenn Einkäufe offen sind: sofortige lokale Benachrichtigung.
     public func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
         let ud = UserDefaults.standard
-        let count = ud.integer(forKey: "nz_geo_count")
+        // Ort-spezifische Zusammenfassung hat Vorrang vor der allgemeinen.
+        let placeId = region.identifier.replacingOccurrences(of: "nzp_", with: "")
+        var count = ud.integer(forKey: "nz_geo_count")
+        var body = ud.string(forKey: "nz_geo_body") ?? ""
+        if let map = ud.dictionary(forKey: "nz_geo_map"),
+           let entry = map[placeId] as? [String: Any] {
+            if let c = entry["count"] as? Int { count = c }
+            if let b = entry["body"] as? String { body = b }
+        }
         guard count > 0 else { return }
         // Drossel: pro Ort höchstens alle 2 Stunden (wichtig, wenn man daneben wohnt).
         let key = "nz_geo_last_" + region.identifier
@@ -138,7 +152,7 @@ public class NZGeoPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegate
         let placeName = names[region.identifier] ?? "Einkauf"
         let content = UNMutableNotificationContent()
         content.title = "🛒 " + placeName
-        content.body = ud.string(forKey: "nz_geo_body") ?? ""
+        content.body = body
         content.sound = .default
         let req = UNNotificationRequest(identifier: "nzgeo-" + region.identifier, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(req)

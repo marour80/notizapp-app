@@ -90,6 +90,30 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json' } });
     }
 
+    // ---- Wartung: {mode:'find-note', title} → Notiz-Zustand inspizieren (Debug) ----
+    if (payload && payload.mode === 'find-note') {
+      const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const { data: rows } = await supa.from('notes').select('id, owner, share_code, updated_at, data');
+      const q = String(payload.title || '').toLowerCase();
+      const hits = (rows || []).filter((r: any) => ((r.data && r.data.title) || '').toLowerCase().includes(q));
+      const out = [];
+      for (const r of hits) {
+        const { data: mem } = await supa.from('note_members').select('member').eq('note_id', r.id);
+        out.push({
+          id: r.id,
+          title: r.data && r.data.title,
+          owner: r.owner,
+          share_code: r.share_code,
+          members: (mem || []).map((m: any) => m.member),
+          when: r.data && r.data.when,
+          termDone: r.data && r.data.termDone,
+          subtasks: ((r.data && r.data.subtasks) || []).length,
+          updated_at: r.updated_at
+        });
+      }
+      return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json' } });
+    }
+
     // ---- Wartung: {mode:'move-token', from, to} → Token-Zeile auf andere Geräte-ID umziehen ----
     if (payload && payload.mode === 'move-token') {
       const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);

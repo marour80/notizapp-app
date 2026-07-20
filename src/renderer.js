@@ -404,18 +404,46 @@ async function addPlace() {
 }
 
 // Offene Einkäufe für die Ankunfts-Push zusammenfassen (liest das native Plugin beim Betreten).
+// Teilaufgaben mit zugewiesenem Ort zählen NUR an ihrem Ort; unzugeordnete Punkte der
+// Einkaufsliste zählen überall (Standard-Zusammenfassung).
 function updateGeoSummary() {
   if (!(window.NZNative && NZNative.geoSetSummary && NZNative.geoAvailable && NZNative.geoAvailable())) return;
   const shopRe = /einkauf|shopping|shop|kauf|grocer|supermarkt|markt/i;
+  const places = getPlaces();
+
+  // Ort-zugewiesene offene Punkte über ALLE Notizen einsammeln
+  const byPlace = {}; // placeId -> Anzahl offener Punkte
+  (data.notes || []).forEach((n) => {
+    (n.subtasks || []).forEach((s) => {
+      if (s.deleted || (s.status || 'todo') === 'done' || !s.place) return;
+      byPlace[s.place] = (byPlace[s.place] || 0) + 1;
+    });
+  });
+
+  // Unzugeordnete offene Punkte der Einkaufs-/angepinnten Liste (wie bisher)
   const cands = (data.notes || [])
-    .map((n) => ({ n, open: (n.subtasks || []).filter((s) => !s.deleted && (s.status || 'todo') !== 'done').length }))
+    .map((n) => ({
+      n,
+      open: (n.subtasks || []).filter((s) => !s.deleted && (s.status || 'todo') !== 'done' && !s.place).length
+    }))
     .filter((x) => x.open > 0);
   const match = cands.find((x) => shopRe.test(x.n.title || '')) || cands.find((x) => x.n.pinned) || null;
-  if (match) {
-    NZNative.geoSetSummary(match.open, t('placesPushBody', { n: match.open, title: match.n.title || t('untitled') }));
-  } else {
-    NZNative.geoSetSummary(0, '');
-  }
+
+  const defCount = match ? match.open : 0;
+  const defBody = match ? t('placesPushBody', { n: match.open, title: match.n.title || t('untitled') }) : '';
+
+  // Pro Ort: eigene Punkte zuerst, unzugeordnete zählen mit
+  const map = {};
+  places.forEach((p) => {
+    const own = byPlace[p.id] || 0;
+    if (!own) return; // kein Eintrag → Plugin nimmt den Standard
+    const total = own + defCount;
+    let body = t('placesPushBodyPlace', { n: own, place: p.name });
+    if (defCount) body += ' · ' + defBody;
+    map[p.id] = { count: total, body };
+  });
+
+  NZNative.geoSetSummary(defCount, defBody, map);
 }
 
 // ---- Morgen-Briefing: Einstellungen ----
@@ -1184,15 +1212,37 @@ function buildSubItem(st, note, noteShared) {
        <button class="sub-del" title="${t('deleteForever')}">✕</button>`
     : `<button class="sub-photo" title="${t(st.photo ? 'photo' : 'addPhoto')}">📷</button>`;
   const swipeDel = isDeleted ? '' : `<button class="sub-swipe-del" title="${t('deleteSubtask')}">🗑</button>`;
+  // Ort pro Teilaufgabe (nur wenn Einkaufs-Orte existieren): kleine Auswahl neben dem Foto.
+  const places = getPlaces();
+  const placeSel = !isDeleted && places.length
+    ? `<select class="sub-place" title="${t('subPlace')}">
+         <option value="" selected>🏬</option>
+         ${st.place ? `<option value="__clear">${t('noPlace')}</option>` : ''}
+         ${places.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}
+       </select>`
+    : '';
   li.innerHTML = `
       ${swipeDel}
       <div class="sub-inner">
         <span class="dot dot-${status}" title="${statusLabel(status)} ${t('clickToCycle')}"></span>
         <input class="sub-text" type="text" value="" ${readOnly ? 'readonly' : ''} />
         ${st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : ''}
+        ${st.place && places.find((p) => p.id === st.place) ? `<span class="sub-place-tag">📍${escapeHtml(places.find((p) => p.id === st.place).name)}</span>` : ''}
         ${noteShared && !isDeleted ? whoBadge(note, st) : ''}
+        ${placeSel}
         ${actions}
       </div>`;
+  const psel = li.querySelector('.sub-place');
+  if (psel) {
+    psel.onchange = () => {
+      const v = psel.value;
+      if (!v) return;
+      st.place = v === '__clear' ? null : v;
+      note.updatedAt = Date.now();
+      persist();
+      renderSubtasks();
+    };
+  }
   const input = li.querySelector('.sub-text');
   input.value = st.text || '';
   const thumb = li.querySelector('.sub-thumb');
@@ -1242,10 +1292,14 @@ function updateSimpleNoteUI(note) {
   bodyEl.classList.toggle('hidden', !showBody);
   if (bodyEl.value !== (note.body || '')) bodyEl.value = note.body || '';
   // Datum-Zeile immer anbieten → jede Notiz kann manuell zum Termin werden.
+  // WICHTIG: Ohne Termin nur einen Knopf zeigen – das offene datetime-Feld hat sonst
+  // beim versehentlichen Antippen sofort ein Datum gesetzt (Notiz "verschwand" in Termine).
   whenRow.classList.remove('hidden');
   const wi = $('whenInput');
   const val = note.when ? (String(note.when).includes('T') ? String(note.when).slice(0, 16) : note.when + 'T09:00') : '';
   if (wi.value !== val) wi.value = val;
+  $('whenAddBtn').classList.toggle('hidden', !!note.when);
+  wi.classList.toggle('hidden', !note.when);
   $('whenClear').classList.toggle('hidden', !note.when);
   // Erinnerungs-Zeile nur bei Terminen: eigene Zeiten oder Standard.
   const remRow = $('noteRemRow');
@@ -2848,8 +2902,17 @@ $('whenClear').onclick = () => {
   if (!note) return;
   note.when = null;
   $('whenInput').value = '';
-  $('whenClear').classList.add('hidden');
-  $('noteRemRow').classList.add('hidden');
+  updateSimpleNoteUI(note);
+  scheduleSave();
+};
+$('whenAddBtn').onclick = () => {
+  const note = currentNote();
+  if (!note) return;
+  const d = new Date();
+  d.setHours(d.getHours() + 1, 0, 0, 0);
+  const p = (x) => String(x).padStart(2, '0');
+  note.when = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':00';
+  updateSimpleNoteUI(note);
   scheduleSave();
 };
 $('noteRemRow').onclick = () => {
