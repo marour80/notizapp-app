@@ -163,12 +163,16 @@ NZStore.onChanged(async (info) => {
     }
   }
 
-  // In-App-Hinweis: jemand arbeitet an einer geteilten Notiz.
-  notifyShared(info);
+  // In-App-Hinweis: NUR wenn jemand ANDERES an einer geteilten Notiz arbeitet.
+  // (Eigene Saves schreiben alle Notizen → ohne diesen Filter kamen Toasts für
+  // jede eigene geteilte Notiz, obwohl niemand anderes etwas geändert hat.)
+  if (!(info && info.self)) {
+    notifyShared(info);
 
-  // Zusätzlich System-Benachrichtigung, wenn das Fenster nicht im Fokus ist.
-  if (info && info.id && !document.hasFocus()) {
-    notifyChange(info.title);
+    // Zusätzlich System-Benachrichtigung, wenn das Fenster nicht im Fokus ist.
+    if (info && info.id && !document.hasFocus()) {
+      notifyChange(info.title);
+    }
   }
 });
 
@@ -519,9 +523,14 @@ function renderFolderSelect() {
   data.folders.forEach((f) => {
     const opt = document.createElement('option');
     opt.value = f;
-    opt.textContent = f;
+    opt.textContent = '📁 ' + f;
     folderSelect.appendChild(opt);
   });
+  // Ordner direkt aus dem Editor anlegen können (auf dem Handy gibt es sonst keinen Weg)
+  const add = document.createElement('option');
+  add.value = '__new';
+  add.textContent = t('newFolderOpt');
+  folderSelect.appendChild(add);
 }
 
 // ---- Agenda: Notizen mit Termin als eigene, chronologische Sektion ----
@@ -1212,13 +1221,14 @@ function buildSubItem(st, note, noteShared) {
        <button class="sub-del" title="${t('deleteForever')}">✕</button>`
     : `<button class="sub-photo" title="${t(st.photo ? 'photo' : 'addPhoto')}">📷</button>`;
   const swipeDel = isDeleted ? '' : `<button class="sub-swipe-del" title="${t('deleteSubtask')}">🗑</button>`;
-  // Ort pro Teilaufgabe (nur wenn Einkaufs-Orte existieren): kleine Auswahl neben dem Foto.
+  // Ort pro Teilaufgabe (nur wenn Einkaufs-Orte existieren): beschrifteter Chip,
+  // der den gewählten Ort direkt anzeigt ("📍 Rewe") bzw. "📍 Ort" als Aufforderung.
   const places = getPlaces();
   const placeSel = !isDeleted && places.length
-    ? `<select class="sub-place" title="${t('subPlace')}">
-         <option value="" selected>🏬</option>
-         ${st.place ? `<option value="__clear">${t('noPlace')}</option>` : ''}
-         ${places.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}
+    ? `<select class="sub-place ${st.place ? 'on' : ''}" title="${t('subPlace')}">
+         ${st.place ? '' : `<option value="" selected>📍 ${t('placeWord')}</option>`}
+         <option value="__clear">${t('noPlace')}</option>
+         ${places.map((p) => `<option value="${p.id}" ${st.place === p.id ? 'selected' : ''}>📍 ${escapeHtml(p.name)}</option>`).join('')}
        </select>`
     : '';
   li.innerHTML = `
@@ -1227,7 +1237,6 @@ function buildSubItem(st, note, noteShared) {
         <span class="dot dot-${status}" title="${statusLabel(status)} ${t('clickToCycle')}"></span>
         <input class="sub-text" type="text" value="" ${readOnly ? 'readonly' : ''} />
         ${st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : ''}
-        ${st.place && places.find((p) => p.id === st.place) ? `<span class="sub-place-tag">📍${escapeHtml(places.find((p) => p.id === st.place).name)}</span>` : ''}
         ${noteShared && !isDeleted ? whoBadge(note, st) : ''}
         ${placeSel}
         ${actions}
@@ -2888,14 +2897,27 @@ $('themeToggle').onclick = () =>
 if ($('langToggle')) $('langToggle').onclick = toggleLanguage;
 
 titleInput.oninput = scheduleSave;
-folderSelect.onchange = scheduleSave;
+folderSelect.onchange = () => {
+  // "+ Neuer Ordner…" gewählt → Namen abfragen, anlegen, dieser Notiz zuweisen
+  if (folderSelect.value === '__new') {
+    const name = (prompt(t('newFolderPrompt')) || '').trim();
+    if (name && !data.folders.includes(name)) data.folders.push(name);
+    renderFolderSelect();
+    folderSelect.value = name && data.folders.includes(name) ? name : '';
+    renderFolders();
+  }
+  scheduleSave();
+};
 $('bodyInput').oninput = scheduleSave;
 $('whenInput').onchange = () => {
   const note = currentNote();
   if (!note) return;
+  const hadWhen = !!note.when;
   note.when = $('whenInput').value || null;
   updateSimpleNoteUI(note); // Erinnerungs-Zeile + ✕ mitziehen
   scheduleSave();
+  // Klar sagen, was passiert: Notiz wandert in den Termine-Tab (sonst wirkt sie "verschwunden").
+  if (!hadWhen && note.when) showToast(t('toastBecameTermin', { title: note.title || t('untitled') }));
 };
 $('whenClear').onclick = () => {
   const note = currentNote();
@@ -2914,6 +2936,7 @@ $('whenAddBtn').onclick = () => {
   note.when = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':00';
   updateSimpleNoteUI(note);
   scheduleSave();
+  showToast(t('toastBecameTermin', { title: note.title || t('untitled') }));
 };
 $('noteRemRow').onclick = () => {
   const note = currentNote();

@@ -197,7 +197,9 @@
             .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, (p) => {
               if (isSelfEcho()) return; // eigene Änderung nicht doppelt laden
               const row = p.new && p.new.id ? p.new : p.old;
-              const info = row && row.data ? { id: row.id, title: row.data.title, event: p.eventType } : {};
+              const info = row && row.data
+                ? { id: row.id, title: row.data.title, event: p.eventType, self: row.last_actor === uid }
+                : {};
               cb(info);
             })
             .subscribe();
