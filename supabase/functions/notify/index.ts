@@ -90,6 +90,24 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json' } });
     }
 
+    // ---- Wartung: {mode:'recent-invites'} → letzte Einladungen + Existenz der Notiz ----
+    if (payload && payload.mode === 'recent-invites') {
+      const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const { data: invs } = await supa.from('invites').select('*').order('created_at', { ascending: false }).limit(6);
+      const out = [];
+      for (const i of invs || []) {
+        const { data: note } = await supa.from('notes').select('id, owner, share_code, updated_at, data').eq('id', i.note_id).maybeSingle();
+        const { data: mem } = await supa.from('note_members').select('member').eq('note_id', i.note_id);
+        out.push({
+          invite: { id: i.id, note_id: i.note_id, code: i.code, from: i.from_uid, to: i.to_uid, status: i.status, title: i.note_title, created: i.created_at },
+          noteExists: !!note,
+          note: note ? { owner: note.owner, share_code: note.share_code, title: note.data && note.data.title, when: note.data && note.data.when, subtasks: ((note.data && note.data.subtasks) || []).length, updated: note.updated_at } : null,
+          members: (mem || []).map((m: any) => m.member)
+        });
+      }
+      return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json' } });
+    }
+
     // ---- Wartung: {mode:'find-note', title} → Notiz-Zustand inspizieren (Debug) ----
     if (payload && payload.mode === 'find-note') {
       const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);

@@ -168,6 +168,7 @@
           });
           const { error } = await c.from('notes').upsert(rows);
           if (error) throw error;
+          mine.forEach((n) => { lastOwners[n.id] = uid; }); // Besitz-Wissen aktuell halten
         }
 
         // Fremde geteilte Notizen: nur Inhalt aktualisieren (Besitz/Code unangetastet).
@@ -181,9 +182,12 @@
         }
 
         // Nur EIGENE entfernte Notizen löschen (fremde geteilte bleiben).
+        // Sicherheitsnetz: NUR Zeilen löschen, die wir auch selbst als eigene kannten
+        // (lastOwners). Verhindert, dass eine Cloud-Zeile mit überraschendem owner=uid
+        // (z.B. nach Identitätswechsel) fälschlich als "gelöscht" behandelt wird.
         const keep = new Set(mine.map((n) => n.id));
         const { data: existing } = await c.from('notes').select('id').eq('owner', uid);
-        const toDelete = (existing || []).filter((r) => !keep.has(r.id)).map((r) => r.id);
+        const toDelete = (existing || []).filter((r) => !keep.has(r.id) && lastOwners[r.id] === uid).map((r) => r.id);
         if (toDelete.length) await c.from('notes').delete().in('id', toDelete);
       } catch (e) {
         console.warn('[NZSupabase] save() offline/Fehler (lokal gesichert):', e.message || e);
@@ -213,19 +217,30 @@
   async function shareNote(note) {
     const c = await ensureClient();
     let code = (note.share && note.share.code) || global.NZ.makeShareCode();
+    // WICHTIG: Besitzer der Cloud-Zeile NIE überschreiben! Der alte Upsert setzte
+    // owner=uid auch bei fremden Notizen → der eigene Sync hielt sie danach für
+    // eine "eigene gelöschte" Notiz und LÖSCHTE sie in der Cloud (für alle!).
+    const { data: existing } = await c.from('notes').select('owner').eq('id', note.id).maybeSingle();
     for (let attempt = 0; ; attempt++) {
       note.share = { code, createdBy: global.NZDevice.me(), createdAt: Date.now() };
-      // UPSERT: stellt sicher, dass die Notiz MIT share_code in der Cloud liegt,
-      // auch wenn sie vorher noch nicht (vollständig) gespeichert war.
-      const row = {
-        id: note.id,
-        owner: uid,
-        data: stripRuntime(note),
-        share_code: code,
-        updated_at: new Date().toISOString()
-      };
-      if (pushOn()) row.last_actor = uid;
-      const { error } = await c.from('notes').upsert(row);
+      let error = null;
+      if (existing) {
+        const patch = { data: stripRuntime(note), share_code: code, updated_at: new Date().toISOString() };
+        if (pushOn()) patch.last_actor = uid;
+        ({ error } = await c.from('notes').update(patch).eq('id', note.id));
+        lastOwners[note.id] = existing.owner; // Besitz-Wissen aktuell halten
+      } else {
+        const row = {
+          id: note.id,
+          owner: uid,
+          data: stripRuntime(note),
+          share_code: code,
+          updated_at: new Date().toISOString()
+        };
+        if (pushOn()) row.last_actor = uid;
+        ({ error } = await c.from('notes').insert(row));
+        if (!error) lastOwners[note.id] = uid;
+      }
       if (!error) return code;
       // Code-Kollision (share_code unique) → neuen Code versuchen
       if (error.code === '23505' && attempt < 5) {

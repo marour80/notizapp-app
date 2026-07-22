@@ -144,7 +144,16 @@ function toggleLanguage() {
 
 // Live-sync when another window/tab/device changes notes
 NZStore.onChanged(async (info) => {
-  data = await NZStore.load();
+  const fresh = await NZStore.load();
+  // Pro Notiz gewinnt die NEUERE Version: Der Reload darf gerade gemachte lokale
+  // Änderungen (z.B. Ort-Zuweisung, deren Upload noch läuft) nicht überschreiben –
+  // das ließ Zuweisungen "wieder verschwinden".
+  const prevById = new Map((data.notes || []).map((n) => [n.id, n]));
+  fresh.notes = (fresh.notes || []).map((n) => {
+    const p = prevById.get(n.id);
+    return p && (p.updatedAt || 0) > (n.updatedAt || 0) ? p : n;
+  });
+  data = fresh;
   renderAll();
 
   // Offene Notiz wurde gelöscht?
