@@ -2108,22 +2108,44 @@ body:not(.settings-open) .settings-screen { display: none; }
   position: relative;
   overflow: hidden;
   padding: 0;
+  margin-bottom: 8px;
+  border-radius: 12px;
   touch-action: pan-y;
 }
 .sub-item:hover { background: transparent; }
+/* Teilaufgabe als Mini-Karte: oben Punkt+Text, darunter Meta (Person · Ort · Foto) */
 .sub-inner {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 4px;
-  border-radius: 8px;
-  background: var(--bg-2);
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--glass, var(--bg-2));
+  border: 1px solid var(--glass-border, var(--border));
   transform: translateX(0);
-  transition: transform 0.18s ease;
+  transition: transform 0.18s ease, border-color 0.15s ease;
   position: relative;
   z-index: 1;
 }
-.sub-item:hover .sub-inner { background: var(--bg-3); }
+.sub-item:hover .sub-inner { border-color: var(--accent); }
+.sub-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.sub-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-left: 26px; /* unter dem Text ausgerichtet (Punkt + Abstand) */
+  min-width: 0;
+}
+.sub-meta .sub-photo { margin-left: auto; opacity: 0.7; font-size: 16px; padding: 2px 6px; }
+.sub-meta .sub-thumb { width: 34px; height: 34px; }
+.sub-meta .sub-who {
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sub-item.deleted .sub-inner { opacity: 0.55; }
 .sub-item.dragging .sub-inner { transition: none; }
 .sub-item.swiped .sub-inner { transform: translateX(-72px); }
 .sub-swipe-del {

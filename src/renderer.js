@@ -1240,15 +1240,22 @@ function buildSubItem(st, note, noteShared) {
          ${places.map((p) => `<option value="${p.id}" ${st.place === p.id ? 'selected' : ''}>📍 ${escapeHtml(p.name)}</option>`).join('')}
        </select>`
     : '';
+  // Karten-Layout: oben Status + Text, darunter Meta-Zeile (Person · Ort · Foto).
+  // So bleibt der Foto-Knopf auch bei langen Namen/Orten immer erreichbar.
+  const metaBits = isDeleted
+    ? ''
+    : [noteShared ? whoBadge(note, st) : '', placeSel, st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : '', actions]
+        .filter(Boolean)
+        .join('');
   li.innerHTML = `
       ${swipeDel}
       <div class="sub-inner">
-        <span class="dot dot-${status}" title="${statusLabel(status)} ${t('clickToCycle')}"></span>
-        <input class="sub-text" type="text" value="" ${readOnly ? 'readonly' : ''} />
-        ${st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : ''}
-        ${noteShared && !isDeleted ? whoBadge(note, st) : ''}
-        ${placeSel}
-        ${actions}
+        <div class="sub-main">
+          <span class="dot dot-${status}" title="${statusLabel(status)} ${t('clickToCycle')}"></span>
+          <input class="sub-text" type="text" value="" ${readOnly ? 'readonly' : ''} />
+          ${isDeleted ? actions : ''}
+        </div>
+        ${metaBits ? `<div class="sub-meta">${metaBits}</div>` : ''}
       </div>`;
   const psel = li.querySelector('.sub-place');
   if (psel) {
