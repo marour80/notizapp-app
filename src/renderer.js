@@ -165,7 +165,7 @@ NZStore.onChanged(async (info) => {
   // Offene Notiz wurde von jemandem geändert → Teilaufgaben live nachziehen
   // (ohne Titel/Text zu überschreiben, falls gerade getippt wird).
   if (info && info.id && info.id === activeNoteId) {
-    const editing = document.activeElement && document.activeElement.classList.contains('sub-text');
+    const editing = document.activeElement && (document.activeElement.classList.contains('sub-text') || document.activeElement.classList.contains('sub-place'));
     if (!editing) {
       renderSubtasks();
       updateSharedBadge(currentNote());
@@ -392,6 +392,9 @@ function renderPlacesModal() {
 async function addPlace() {
   const btn = $('placeAddBtn');
   btn.disabled = true;
+  // Radar-Animation zeigen – GPS braucht ein paar Sekunden, sonst wirkt die App eingefroren.
+  $('placeLocating').classList.remove('hidden');
+  btn.classList.add('hidden');
   try {
     const status = await NZNative.geoRequestPermission();
     if (status === 'denied') {
@@ -399,6 +402,9 @@ async function addPlace() {
       return;
     }
     const pos = await NZNative.geoCurrentPosition();
+    // Animation VOR der Namens-Abfrage ausblenden (prompt blockiert die Anzeige)
+    $('placeLocating').classList.add('hidden');
+    btn.classList.remove('hidden');
     if (!pos) return;
     const name = (prompt(t('placeNamePrompt'), 'Rewe') || '').trim();
     if (!name) return;
@@ -413,6 +419,8 @@ async function addPlace() {
     alert(t('errGeneric') + (e.message || e));
   } finally {
     btn.disabled = false;
+    $('placeLocating').classList.add('hidden');
+    btn.classList.remove('hidden');
   }
 }
 
@@ -976,7 +984,7 @@ function startSharedPoll(noteId) {
     }
     // Nicht reinpfuschen, während hier gerade getippt wird.
     const ae = document.activeElement;
-    if (ae && (ae.classList.contains('sub-text') || ae.id === 'titleInput' || ae.id === 'bodyInput')) return;
+    if (ae && (ae.classList.contains('sub-text') || ae.classList.contains('sub-place') || ae.id === 'titleInput' || ae.id === 'bodyInput')) return;
     try {
       const row = await NZShare.fetchNote(noteId);
       const remote = row && row.data;
@@ -1262,8 +1270,13 @@ function buildSubItem(st, note, noteShared) {
     psel.onchange = () => {
       const v = psel.value;
       if (!v) return;
-      st.place = v === '__clear' ? null : v;
-      note.updatedAt = Date.now();
+      // Immer auf dem AKTUELLEN Objekt arbeiten: Nach einem Live-Reload zeigen die
+      // Closure-Referenzen sonst auf eine verwaiste Kopie → Auswahl "passierte nicht".
+      const cur = currentNote();
+      const target = cur && (cur.subtasks || []).find((x) => x.id === st.id);
+      if (!target) return;
+      target.place = v === '__clear' ? null : v;
+      cur.updatedAt = Date.now();
       persist();
       renderSubtasks();
     };
@@ -2946,6 +2959,8 @@ $('whenClear').onclick = () => {
 $('whenAddBtn').onclick = () => {
   const note = currentNote();
   if (!note) return;
+  // Klare Ansage VOR der Umwandlung: die Notiz zieht in den Termine-Tab um.
+  if (!confirm(t('whenConfirmMsg', { title: note.title || t('untitled') }))) return;
   const d = new Date();
   d.setHours(d.getHours() + 1, 0, 0, 0);
   const p = (x) => String(x).padStart(2, '0');

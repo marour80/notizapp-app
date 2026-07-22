@@ -1425,6 +1425,48 @@ body:not(.settings-open) .settings-screen { display: none; }
 .place-row .place-radius { padding: 5px 8px; font-size: 12.5px; }
 .places-perm { color: #ff9f43; }
 
+/* Radar-Animation: Standort wird ermittelt */
+.place-locating {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0 22px;
+  color: var(--text-dim);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.radar {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.radar-pin {
+  font-size: 34px;
+  z-index: 1;
+  animation: pin-bounce 1.2s ease-in-out infinite;
+}
+.radar-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: radar-ping 2.1s ease-out infinite;
+}
+.radar-ring.r2 { animation-delay: 0.7s; }
+.radar-ring.r3 { animation-delay: 1.4s; }
+@keyframes radar-ping {
+  0% { transform: scale(0.25); opacity: 0.9; }
+  100% { transform: scale(1.1); opacity: 0; }
+}
+@keyframes pin-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
 .brief-time-row {
   display: flex;
   align-items: center;
