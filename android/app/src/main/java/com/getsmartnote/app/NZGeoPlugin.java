@@ -118,18 +118,30 @@ public class NZGeoPlugin extends Plugin {
     private void readPosition(PluginCall call) {
         FusedLocationProviderClient fused = LocationServices.getFusedLocationProviderClient(getContext());
         CancellationTokenSource cts = new CancellationTokenSource();
-        fused.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.getToken())
+        // HIGH_ACCURACY: nutzt GPS UND WLAN-Ortung – BALANCED findet auf WLAN-Tablets drinnen oft nichts.
+        fused.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.getToken())
             .addOnSuccessListener(loc -> {
-                if (loc != null) {
-                    JSObject r = new JSObject();
-                    r.put("lat", loc.getLatitude());
-                    r.put("lng", loc.getLongitude());
-                    call.resolve(r);
-                } else {
-                    call.reject("Standort nicht verfügbar");
-                }
+                if (loc != null) resolvePos(call, loc.getLatitude(), loc.getLongitude());
+                else fallbackLastPosition(call, fused);
+            })
+            .addOnFailureListener(e -> fallbackLastPosition(call, fused));
+    }
+
+    @SuppressLint("MissingPermission")
+    private void fallbackLastPosition(PluginCall call, FusedLocationProviderClient fused) {
+        fused.getLastLocation()
+            .addOnSuccessListener(last -> {
+                if (last != null) resolvePos(call, last.getLatitude(), last.getLongitude());
+                else call.reject("Standort nicht verfuegbar. Bitte pruefen: Ist der Standort am Geraet eingeschaltet (Schnelleinstellungen) und in den Standort-Einstellungen die Google-Standortgenauigkeit aktiv? Draussen/am Fenster klappt es am besten.");
             })
             .addOnFailureListener(e -> call.reject("Standort nicht verfügbar: " + e.getMessage()));
+    }
+
+    private void resolvePos(PluginCall call, double lat, double lng) {
+        JSObject r = new JSObject();
+        r.put("lat", lat);
+        r.put("lng", lng);
+        call.resolve(r);
     }
 
     static PendingIntent geoPendingIntent(Context ctx) {
