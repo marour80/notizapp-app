@@ -2717,7 +2717,18 @@ async function processVoice(blob) {
     fd.append('now', new Date().toString());
     fd.append('lang', (window.NZI18N && NZI18N.lang) || 'de');
     // In einer offenen Notiz gestartet → der KI sagen, worauf sich "hier"/"füge hinzu" bezieht.
-    if (voiceTargetId) fd.append('openNoteId', voiceTargetId);
+    if (voiceTargetId) {
+      fd.append('openNoteId', voiceTargetId);
+      // Titel + Punkte als Erkennungs-Kontext für Whisper: verankert die TATSÄCHLICHE Sprache
+      // der Liste (z. B. Arabisch) statt der App-Sprache – kurze Befehle kippten sonst ins Deutsche.
+      const tn = data.notes.find((n) => n.id === voiceTargetId);
+      if (tn) {
+        const hint = [tn.title || '', ...(tn.subtasks || []).filter((s) => !s.deleted).slice(0, 12).map((s) => s.text)]
+          .filter(Boolean)
+          .join(', ');
+        if (hint) fd.append('sttHint', hint.slice(0, 400));
+      }
+    }
     if (voiceDraft) {
       fd.append(
         'context',

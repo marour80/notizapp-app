@@ -51,19 +51,23 @@ function audioFilename(file: any): string {
 }
 
 // Sprachnachricht -> Text via OpenAI Whisper.
-async function transcribe(file: any, lang: string | null = null): Promise<string> {
+async function transcribe(file: any, lang: string | null = null, hint: string | null = null): Promise<string> {
   const key = Deno.env.get('OPENAI_API_KEY');
   if (!key) throw new Error('OPENAI_API_KEY fehlt (Secret in Supabase setzen).');
   // whisper-1: in diesem OpenAI-Projekt freigeschaltet und akzeptiert die gängigen Audioformate.
   // (gpt-4o-mini-transcribe wäre genauer, ist hier aber nicht freigegeben → "does not have access".)
   const models = ['whisper-1'];
   const name = audioFilename(file);
-  // Kontext-Anker gegen Whisper-Halluzinationen (kurze/leise Aufnahmen kippen sonst
-  // gern in fremdsprachige Floskeln). Der Prompt verankert Sprache + Wortschatz.
-  const bias =
-    lang === 'en'
-      ? 'Voice input for a notes app: shopping lists, tasks, appointments, or questions about my notes.'
-      : 'Sprachnotiz für eine Notiz-App: Einkaufslisten, Aufgaben, Termine oder Fragen zu meinen Notizen.';
+  // Kontext-Anker gegen Whisper-Halluzinationen – aber SPRACHNEUTRAL (drei Sprachen gemischt):
+  // Ein rein deutscher/englischer Anker zog kurze Aufnahmen in die App-Sprache
+  // (arabisch gesprochen → deutscher Text). Gemischt bleibt der Wortschatz, ohne Sprach-Sog.
+  let bias =
+    'Notiz-App Spracheingabe: Einkauf, Aufgaben, Termine. ' +
+    'Notes app voice input: shopping, tasks, appointments. ' +
+    'إدخال صوتي لتطبيق ملاحظات: تسوق، مهام، مواعيد.';
+  // Kontext der offenen Notiz (Titel + Punkte) hat Vorrang: verankert die TATSÄCHLICHE
+  // Sprache und die Artikelnamen der Liste – wichtigster Hebel für Befehle IN einer Notiz.
+  if (hint && hint.trim()) bias += ' ' + hint.trim().slice(0, 400);
   const errs: string[] = [];
   for (const model of models) {
     const fd = new FormData();
@@ -272,7 +276,8 @@ Deno.serve(async (req) => {
       if (!file) return json({ error: 'Keine Audiodatei empfangen.' }, 400);
       console.log('[Claude] Audio empfangen:', (file as any).name, '|', (file as any).type, '|', ((file as any).size ?? '?') + ' bytes');
       const langField = form.get('lang') ? String(form.get('lang')) : null;
-      const transcript = await transcribe(file, langField);
+      const sttHint = form.get('sttHint') ? String(form.get('sttHint')) : null;
+      const transcript = await transcribe(file, langField, sttHint);
       console.log('[Claude] Transkript (' + transcript.length + ' Zeichen):', transcript.slice(0, 160));
       if (!transcript.trim()) return json({ error: 'Nichts verstanden – bitte nochmal aufnehmen.' }, 400);
       let context: any = null;
