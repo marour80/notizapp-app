@@ -1315,6 +1315,14 @@ function buildSubItem(st, note, noteShared) {
   return li;
 }
 
+// Textfeld wächst mit dem Inhalt (klein starten, Deckel bei ~1/3 Screen) – Teilaufgaben behalten den Platz.
+function autosizeBody() {
+  const el = $('bodyInput');
+  if (!el || el.classList.contains('hidden')) return;
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, Math.round(window.innerHeight * 0.34)) + 'px';
+}
+
 // Einfache Notiz (ohne Teilaufgaben): Textfeld + Termin-Zeile im Editor pflegen.
 function updateSimpleNoteUI(note) {
   const bodyEl = $('bodyInput');
@@ -1329,6 +1337,7 @@ function updateSimpleNoteUI(note) {
   const showBody = !!(note.body || liveSubs.length === 0);
   bodyEl.classList.toggle('hidden', !showBody);
   if (bodyEl.value !== (note.body || '')) bodyEl.value = note.body || '';
+  autosizeBody();
   // Datum-Zeile immer anbieten → jede Notiz kann manuell zum Termin werden.
   // WICHTIG: Ohne Termin nur einen Knopf zeigen – das offene datetime-Feld hat sonst
   // beim versehentlichen Antippen sofort ein Datum gesetzt (Notiz "verschwand" in Termine).
@@ -2707,6 +2716,8 @@ async function processVoice(blob) {
     fd.append('notes', JSON.stringify(notesDigest()));
     fd.append('now', new Date().toString());
     fd.append('lang', (window.NZI18N && NZI18N.lang) || 'de');
+    // In einer offenen Notiz gestartet → der KI sagen, worauf sich "hier"/"füge hinzu" bezieht.
+    if (voiceTargetId) fd.append('openNoteId', voiceTargetId);
     if (voiceDraft) {
       fd.append(
         'context',
@@ -2937,7 +2948,10 @@ folderSelect.onchange = () => {
   }
   scheduleSave();
 };
-$('bodyInput').oninput = scheduleSave;
+$('bodyInput').oninput = () => {
+  autosizeBody();
+  scheduleSave();
+};
 $('whenInput').onchange = () => {
   const note = currentNote();
   if (!note) return;
@@ -3429,6 +3443,41 @@ $('backBtn').onclick = () => {
     renderAll();
   }
 };
+
+// Android-Zurück-Knopf: Schritt für Schritt zurück statt die App zu schließen.
+// Reihenfolge: offenes Modal → Menü → Editor → Suche → Termine/Einstellungen → App in den Hintergrund.
+NZNative.onBackButton(() => {
+  const overlays = Array.from(document.querySelectorAll('.modal-overlay:not(.hidden)'));
+  const top = overlays[overlays.length - 1];
+  if (top) {
+    if (top.id === 'voiceModal') closeVoice();
+    else {
+      const x = top.querySelector('.modal-close');
+      if (x) x.click();
+      else top.classList.add('hidden');
+    }
+    return true;
+  }
+  if (document.body.classList.contains('nav-open')) {
+    setNav(false);
+    return true;
+  }
+  if (document.body.classList.contains('editor-open')) {
+    $('backBtn').click(); // inkl. Leere-Notiz-Verwerfen + Rückkehr zum Termine-Tab
+    return true;
+  }
+  if (document.body.classList.contains('search-open')) {
+    document.body.classList.remove('search-open');
+    setActiveTab('notes');
+    return true;
+  }
+  if (document.body.classList.contains('settings-open') || document.body.classList.contains('termine-open')) {
+    document.body.classList.remove('termine-open', 'settings-open');
+    setActiveTab('notes');
+    return true;
+  }
+  return false; // Startbildschirm → Android darf die App in den Hintergrund legen
+});
 
 // Wisch von der linken Kante nach rechts → zurück (wie die iOS-Zurück-Geste).
 // Führt zur Liste bzw. zum Termine-Tab zurück, je nachdem woher man kam.

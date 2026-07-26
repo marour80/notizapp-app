@@ -83,7 +83,7 @@ async function transcribe(file: any, lang: string | null = null): Promise<string
   throw new Error('Transkription fehlgeschlagen: ' + errs.join('  ||  '));
 }
 
-async function generate(client: any, prompt: string, isVoice = false, context: any = null, notes: any[] | null = null, now: string | null = null, lang: string | null = null) {
+async function generate(client: any, prompt: string, isVoice = false, context: any = null, notes: any[] | null = null, now: string | null = null, lang: string | null = null, openNoteId: string | null = null) {
   const schema = {
     type: 'object',
     additionalProperties: false,
@@ -106,6 +106,11 @@ async function generate(client: any, prompt: string, isVoice = false, context: a
   if (now) userContent += 'JETZT (aktuelles Datum/Uhrzeit des Nutzers): ' + now + '\n';
   if (lang) userContent += 'APP-SPRACHE des Nutzers: ' + (lang === 'en' ? 'Englisch' : 'Deutsch') + '\n';
   if (notes && notes.length) userContent += 'VORHANDENE NOTIZEN DES NUTZERS (JSON):\n' + JSON.stringify(notes) + '\n\n';
+  if (openNoteId)
+    userContent +=
+      'GEÖFFNETE NOTIZ: Der Nutzer spricht, während die Notiz mit id="' + openNoteId + '" geöffnet ist. ' +
+      'Unklare Bezüge ("diese Liste", "hier", reine Aufzählungen oder Ergänzungen wie "noch Milch und Butter") beziehen sich auf DIESE Notiz → intent="edit" mit targetId="' + openNoteId + '" und den NEUEN Punkten in items. ' +
+      'Nur klar abweichende Eingaben (ausdrücklich neue Liste/Notiz, Frage, anderer Termin) anders behandeln.\n\n';
   userContent += (isVoice ? 'Gesprochene Eingabe: ' : 'Eingabe: ') + prompt;
   if (context && context.title) {
     userContent =
@@ -281,7 +286,8 @@ Deno.serve(async (req) => {
         if (nRaw) notes = JSON.parse(String(nRaw));
       } catch {}
       const now = form.get('now') ? String(form.get('now')) : null;
-      const list = await generate(client, transcript, true, context, notes, now, langField);
+      const openNoteId = form.get('openNoteId') ? String(form.get('openNoteId')) : null;
+      const list = await generate(client, transcript, true, context, notes, now, langField, openNoteId);
       return json({ ...list, transcript });
     }
 

@@ -338,6 +338,26 @@
     return true;
   }
 
+  // ---- Android-Zurück-Knopf ----
+  // handler() gibt true zurück, wenn er die Geste behandelt hat (Screen/Modal geschlossen);
+  // false = wir sind ganz oben → App in den Hintergrund (statt sie hart zu beenden).
+  function onBackButton(handler) {
+    const App = plugin('App');
+    if (!App || !App.addListener) return;
+    App.addListener('backButton', () => {
+      let handled = false;
+      try {
+        handled = !!handler();
+      } catch {}
+      if (!handled) {
+        try {
+          if (App.minimizeApp) App.minimizeApp();
+          else if (App.exitApp) App.exitApp();
+        } catch {}
+      }
+    });
+  }
+
   // ---- Einkaufs-Orte (Geofencing): Erinnerung bei Ankunft am Laden ----
   function geoAvailable() {
     return !!plugin('NZGeo');
@@ -421,5 +441,5 @@
     });
   }
 
-  global.NZNative = { isNative, onDeepLink, onAppRoute, onAuthCallback, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, initTermActions, updateWidget, geoAvailable, geoRequestPermission, geoAuthStatus, geoCurrentPosition, geoSetPlaces, geoSetSummary, parseCode, plugin, initKeyboard };
+  global.NZNative = { isNative, onDeepLink, onAppRoute, onAuthCallback, onBackButton, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, initTermActions, updateWidget, geoAvailable, geoRequestPermission, geoAuthStatus, geoCurrentPosition, geoSetPlaces, geoSetSummary, parseCode, plugin, initKeyboard };
 })(typeof window !== 'undefined' ? window : globalThis);
