@@ -578,9 +578,10 @@ function agendaRow(n, d, askDone) {
   const snippet = stripMd(n.body || '');
   const sub = [time, snippet].filter(Boolean).join(' · ');
   const li = document.createElement('li');
-  li.className = 'agenda-item' + (askDone ? ' agenda-ask' : '');
+  li.className = 'agenda-item' + (askDone ? ' agenda-ask' : '') + (n.termDone ? ' only-del' : '');
   li.innerHTML = `
     <button class="agenda-del" title="${t('delete')}" aria-label="${t('delete')}">🗑</button>
+    ${n.termDone ? '' : `<button class="agenda-done-swipe" title="${t('markDone')}" aria-label="${t('markDone')}">✓</button>`}
     <div class="agenda-inner">
       <div class="agenda-tile"><span class="ag-wd">${escapeHtml(wd)}</span><span class="ag-day">${d.getDate()}</span></div>
       <div class="agenda-main">
@@ -592,13 +593,23 @@ function agendaRow(n, d, askDone) {
       ${askDone ? `<button class="agenda-done-btn" title="${t('markDone')}">✓</button>` : ''}
     </div>`;
   const inner = li.querySelector('.agenda-inner');
-  // Wischen nach links → Löschen aufdecken (wie bei den Notiz-Karten); Tipp öffnet.
-  attachSwipe(li, inner, n.id, 72);
+  // Wischen nach links → ✓ Erledigt + Löschen aufdecken (bei schon erledigten nur Löschen); Tipp öffnet.
+  attachSwipe(li, inner, n.id, n.termDone ? 72 : 144);
   li.querySelector('.agenda-del').onclick = (e) => {
     e.stopPropagation();
     deleteNoteById(n.id);
     renderTermine();
   };
+  const doneSwipe = li.querySelector('.agenda-done-swipe');
+  if (doneSwipe) {
+    doneSwipe.onclick = (e) => {
+      e.stopPropagation();
+      n.termDone = true; // erledigt → wandert nach "Vergangen"
+      n.updatedAt = Date.now();
+      persist();
+      renderTermine();
+    };
+  }
   if (askDone) {
     li.querySelector('.agenda-done-btn').onclick = (e) => {
       e.stopPropagation();
@@ -616,7 +627,8 @@ function renderAgenda(dated, withHead) {
   const wrap = document.createElement('li');
   wrap.className = 'agenda-wrap';
   const buckets = { today: [], tomorrow: [], week: [], later: [], past: [] };
-  dated.forEach((n) => buckets[agendaBucket(whenDate(n))].push(n));
+  // Erledigte Termine (✓) landen immer unter "Vergangen" – auch wenn das Datum noch vorn liegt.
+  dated.forEach((n) => buckets[n.termDone ? 'past' : agendaBucket(whenDate(n))].push(n));
   const byWhen = (a, b) => whenDate(a) - whenDate(b);
   const section = document.createElement('div');
   section.className = 'agenda';
@@ -3045,6 +3057,34 @@ document.querySelectorAll('.status-filter button').forEach((btn) => {
 // ---- Teilen-Events ----
 $('shareBtn').onclick = openShare;
 $('shareClose').onclick = () => showShareModal(false);
+
+// ---- Notiz als reinen Text verschicken (für Leute ohne SmartNote) ----
+function noteAsText(n) {
+  const lines = [n.title || t('untitled')];
+  if (n.when) lines.push('📅 ' + formatWhen(n.when));
+  if (n.body && n.body.trim()) lines.push(n.body.trim());
+  (n.subtasks || [])
+    .filter((s) => !s.deleted)
+    .forEach((s) => lines.push(((s.status || 'todo') === 'done' ? '✅ ' : '⬜ ') + s.text));
+  return lines.join('\n');
+}
+$('shareTextBtn').onclick = async () => {
+  const note = currentNote();
+  if (!note) return;
+  const text = noteAsText(note);
+  try {
+    if (navigator.share) {
+      await navigator.share({ text });
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return; // Nutzer hat das Teilen-Menü zugemacht
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(t('copied'));
+  } catch {}
+};
 $('doShareBtn').onclick = doShare;
 $('unshareBtn').onclick = doUnshare;
 $('joinBtn').onclick = () => showJoinModal(true);

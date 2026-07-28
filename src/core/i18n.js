@@ -106,6 +106,7 @@
       toastUpdatedBy: '🔔 {who} hat „{title}" bearbeitet',
       // Teilen
       shareNote: '🔗 Notiz teilen',
+      shareAsText: '📤 Als Text senden (WhatsApp & Co.)',
       oneMoment: 'Einen Moment…',
       shareHintUnshared: 'Teile diese Notiz, damit andere sie live mitbearbeiten können – ganz ohne Konto.',
       shareNow: 'Jetzt teilen',
@@ -394,6 +395,7 @@
       toastUpdated: '🔔 “{title}” was updated',
       toastUpdatedBy: '🔔 {who} edited “{title}”',
       shareNote: '🔗 Share note',
+      shareAsText: '📤 Send as text (WhatsApp etc.)',
       oneMoment: 'One moment…',
       shareHintUnshared: 'Share this note so others can edit it live — no account needed.',
       shareNow: 'Share now',
