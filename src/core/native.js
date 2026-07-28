@@ -426,6 +426,9 @@
   function initKeyboard() {
     const KB = plugin('Keyboard');
     if (!KB || !KB.addListener) return;
+    // Nur iOS: dort ist resize "none" und wir heben den Editor per CSS über die Tastatur.
+    // Android nutzt natives adjustResize (Manifest) – die CSS-Kompensation würde doppelt schieben.
+    if (!(cap() && cap().getPlatform && cap().getPlatform() === 'ios')) return;
     const doc = global.document;
     if (!doc) return;
     const setKb = (h) => doc.documentElement.style.setProperty('--kb-height', (h || 0) + 'px');

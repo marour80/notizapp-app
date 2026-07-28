@@ -1609,11 +1609,15 @@ body:not(.settings-open) .settings-screen { display: none; }
   align-items: center;
   justify-content: center;
   z-index: 100;
+  /* Safe-Area + Luft: Modals nie unter Statusleiste/Gestenbalken (Android Edge-to-Edge & iPhone-Notch) */
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 12px calc(env(safe-area-inset-bottom, 0px) + 14px);
 }
 .modal {
   position: relative;
   width: 380px;
   max-width: 92vw;
+  max-height: 100%; /* höher als der Platz? → innen scrollen statt unter die Systemleisten wachsen */
+  overflow-y: auto;
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -1971,7 +1975,12 @@ body:not(.settings-open) .settings-screen { display: none; }
   /* nur horizontale/untere Abstaende anpassen – padding-top (Safe-Area, s.o.) NICHT ueberschreiben */
   .editor-toolbar { padding-left: 14px; padding-right: 14px; padding-bottom: 10px; }
   .title-input, .meta-row, .status-row, .body-input, .body-colored, .body-hint, .subtasks, .badge-row { padding-left: 16px; padding-right: 16px; }
-  .modal { width: 92vw; }
+  .modal { width: 92vw; padding: 18px 16px; }
+  .modal h2 { font-size: 16px; margin-bottom: 10px; }
+  .modal-hint { margin-bottom: 10px; }
+  /* Teilen-Dialog kompakt: kleinerer QR, damit alles ohne Gedränge auf einen Handy-Screen passt */
+  .qr-wrap { padding: 8px; }
+  .qr-wrap canvas, .qr-wrap img { width: 132px !important; height: 132px !important; }
 }
 
 /* scrollbars */
