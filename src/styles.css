@@ -1743,6 +1743,19 @@ body:not(.settings-open) .settings-screen { display: none; }
 .ghost-btn:hover { border-color: var(--accent); }
 .ghost-btn.danger { color: var(--danger); }
 .sub-edit-actions { display: flex; gap: 10px; margin-top: 4px; }
+#subEditPlaceSetup { width: 100%; }
+
+/* Freunde-Auswahl im Teilen-Dialog (ab 7 Freunden statt Chips) */
+.friend-select {
+  width: 100%;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  font-size: 14px;
+  padding: 10px 12px;
+  outline: none;
+}
 .sub-edit-actions .primary-btn { flex: 1.4; width: auto; }
 .sub-edit-actions .ghost-btn { flex: 1; }
 

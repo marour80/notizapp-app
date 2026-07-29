@@ -1531,24 +1531,39 @@ function openSubEditor(stId) {
   $('subEditSave').textContent = t(st ? 'saveChanges' : 'insertBtn');
   const ta = $('subEditText');
   ta.value = st ? st.text || '' : '';
-  // Ort-Auswahl nur zeigen, wenn Einkaufs-Orte existieren
-  const places = getPlaces();
-  const row = $('subEditPlaceRow');
-  if (places.length) {
-    const sel = $('subEditPlace');
-    sel.innerHTML =
-      `<option value="">${t('noPlace')}</option>` +
-      places.map((p) => `<option value="${p.id}">📍 ${escapeHtml(p.name)}</option>`).join('');
-    sel.value = st && st.place ? st.place : '';
-    row.classList.remove('hidden');
-  } else {
-    row.classList.add('hidden');
-  }
+  refreshSubEditPlaces(st && st.place ? st.place : '');
   updateSubEditPhotoUI(st ? st.photo : null);
   $('subEditModal').classList.remove('hidden');
   setTimeout(() => {
     try { ta.focus({ preventScroll: true }); } catch { ta.focus(); }
   }, 60);
+}
+
+// Ort-Zeile im Blatt: Auswahl, wenn Orte existieren; sonst (auf Geräten mit Ortung)
+// ein Knopf zum Einrichten. Nur im Browser ohne Ortung verschwindet die Zeile ganz.
+function refreshSubEditPlaces(selected) {
+  const row = $('subEditPlaceRow');
+  const sel = $('subEditPlace');
+  const setup = $('subEditPlaceSetup');
+  const places = getPlaces();
+  const canCreate = !!(window.NZNative && NZNative.geoAvailable && NZNative.geoAvailable());
+  if (!places.length && !canCreate) {
+    row.classList.add('hidden');
+    return;
+  }
+  row.classList.remove('hidden');
+  if (places.length) {
+    sel.classList.remove('hidden');
+    setup.classList.add('hidden');
+    sel.innerHTML =
+      `<option value="">${t('noPlace')}</option>` +
+      places.map((p) => `<option value="${p.id}">📍 ${escapeHtml(p.name)}</option>`).join('');
+    sel.value = selected || '';
+    if (sel.value !== (selected || '')) sel.value = ''; // gewählter Ort existiert (hier) nicht mehr
+  } else {
+    sel.classList.add('hidden');
+    setup.classList.remove('hidden');
+  }
 }
 
 function updateSubEditPhotoUI(photo) {
@@ -1574,7 +1589,8 @@ function saveSubEditor() {
   if (!note || !subEdit) return closeSubEditor();
   const text = $('subEditText').value.trim();
   if (!text) return closeSubEditor(); // leer → nichts anlegen/ändern
-  const placeVisible = !$('subEditPlaceRow').classList.contains('hidden');
+  const placeVisible =
+    !$('subEditPlaceRow').classList.contains('hidden') && !$('subEditPlace').classList.contains('hidden');
   const place = placeVisible ? $('subEditPlace').value || null : undefined;
   if (!note.subtasks) note.subtasks = [];
   if (subEdit.stId) {
@@ -1882,6 +1898,24 @@ async function renderFriendChips() {
   const box = $('friendChips');
   box.innerHTML = '';
   $('friendsShare').classList.toggle('hidden', friends.length === 0);
+  friends.sort((a, b) => friendLabel(a).localeCompare(friendLabel(b)));
+  // Wenige Freunde → Chips (ein Tipp). Viele → Auswahl-Liste, sonst wird der Dialog endlos.
+  if (friends.length > 6) {
+    const sel = document.createElement('select');
+    sel.className = 'friend-select';
+    sel.innerHTML =
+      `<option value="">👥 ${t('pickFriend')}</option>` +
+      friends.map((f, i) => `<option value="${i}">${escapeHtml(friendLabel(f))}</option>`).join('');
+    sel.onchange = () => {
+      const f = friends[Number(sel.value)];
+      sel.value = '';
+      if (!f) return;
+      $('inviteMsg').classList.add('hidden');
+      doSendInvite(f.friend_uid, friendLabel(f));
+    };
+    box.appendChild(sel);
+    return;
+  }
   friends.forEach((f) => {
     const b = document.createElement('button');
     b.className = 'friend-chip';
@@ -3115,6 +3149,10 @@ $('subEditSave').onclick = saveSubEditor;
 $('subEditCancel').onclick = closeSubEditor;
 $('subEditClose').onclick = closeSubEditor;
 $('subEditPhotoBtn').onclick = subEditPickPhoto;
+$('subEditPlaceSetup').onclick = () => {
+  renderPlacesModal();
+  $('placesModal').classList.remove('hidden');
+};
 $('subEditPhotoRemove').onclick = () => {
   if (subEdit) subEdit.photo = null;
   updateSubEditPhotoUI(null);
@@ -3500,6 +3538,8 @@ $('setPlacesRow').onclick = async () => {
 $('placesClose').onclick = () => {
   $('placesModal').classList.add('hidden');
   if ($('setPlacesVal')) $('setPlacesVal').textContent = placesSummary();
+  // Kam man aus dem Teilaufgaben-Blatt: neue Orte sofort in der Auswahl zeigen
+  if (subEdit) refreshSubEditPlaces($('subEditPlace').value || '');
 };
 $('placeAddBtn').onclick = addPlace;
 $('reminderClose').onclick = () => {
