@@ -368,12 +368,14 @@ function placesSummary() {
 function renderPlacesModal() {
   const list = $('placesList');
   list.innerHTML = '';
+  const canShare = !!(window.NZPlaceInvites && cloudReady());
   getPlaces().forEach((p) => {
     const li = document.createElement('li');
     li.className = 'place-row';
     li.innerHTML = `
       <span class="place-name">📍 ${escapeHtml(p.name)}</span>
       <select class="place-radius when-input">${PLACE_RADII.map((r) => `<option value="${r}" ${r === p.radius ? 'selected' : ''}>${r} m</option>`).join('')}</select>
+      ${canShare ? `<button class="place-share when-clear" title="${t('placeShareTitle')}">👥</button>` : ''}
       <button class="place-del when-clear" title="${t('delete')}">✕</button>`;
     li.querySelector('.place-radius').onchange = (e) => {
       const places = getPlaces();
@@ -381,12 +383,16 @@ function renderPlacesModal() {
       if (me) me.radius = parseInt(e.target.value, 10);
       savePlaces(places);
     };
+    const shareBtn = li.querySelector('.place-share');
+    if (shareBtn) shareBtn.onclick = () => openPlaceShare(p);
     li.querySelector('.place-del').onclick = () => {
       savePlaces(getPlaces().filter((x) => x.id !== p.id));
       renderPlacesModal();
     };
     list.appendChild(li);
   });
+  // Karte lohnt sich erst, wenn es Orte gibt
+  $('placesMapBtn').classList.toggle('hidden', getPlaces().length === 0);
 }
 
 async function addPlace() {
@@ -465,6 +471,194 @@ function updateGeoSummary() {
   });
 
   NZNative.geoSetSummary(defCount, defBody, map);
+}
+
+// ---- Ort mit einem Freund teilen ----
+let placeShareTarget = null;
+
+// Eigener Anzeigename für Anfragen (@name, sonst Geräte-Spitzname)
+async function myShareName() {
+  try {
+    const p = await NZProfile.getMyProfile();
+    if (p && p.username) return '@' + p.username;
+  } catch {}
+  return (NZDevice.me() && NZDevice.me().nickname) || null;
+}
+
+async function openPlaceShare(place) {
+  placeShareTarget = place;
+  $('placeShareTitle').textContent = t('placeShareHeading', { name: place.name || '' });
+  $('placeShareMsg').value = '';
+  $('placeShareMsgDone').classList.add('hidden');
+  const box = $('placeShareFriends');
+  box.innerHTML = '';
+  let friends = [];
+  try {
+    friends = await NZFriends.listFriends();
+  } catch {}
+  if (!friends.length) {
+    box.innerHTML = `<span class="modal-hint">${escapeHtml(t('noFriends'))}</span>`;
+  } else {
+    friends.sort((a, b) => friendLabel(a).localeCompare(friendLabel(b)));
+    const send = async (f) => {
+      try {
+        await NZPlaceInvites.sendPlaceInvite(f.friend_uid, placeShareTarget, $('placeShareMsg').value, await myShareName());
+        const done = $('placeShareMsgDone');
+        done.textContent = t('inviteSent', { name: friendLabel(f) });
+        done.classList.remove('hidden');
+        setTimeout(() => $('placeShareModal').classList.add('hidden'), 900);
+      } catch (e) {
+        alert(t('errGeneric') + (e.message || e));
+      }
+    };
+    if (friends.length > 6) {
+      const sel = document.createElement('select');
+      sel.className = 'friend-select';
+      sel.innerHTML =
+        `<option value="">👥 ${t('pickFriend')}</option>` +
+        friends.map((f, i) => `<option value="${i}">${escapeHtml(friendLabel(f))}</option>`).join('');
+      sel.onchange = () => {
+        const f = friends[Number(sel.value)];
+        sel.value = '';
+        if (f) send(f);
+      };
+      box.appendChild(sel);
+    } else {
+      friends.forEach((f) => {
+        const b = document.createElement('button');
+        b.className = 'friend-chip';
+        b.textContent = friendLabel(f);
+        b.onclick = () => send(f);
+        box.appendChild(b);
+      });
+    }
+  }
+  $('placeShareModal').classList.remove('hidden');
+}
+
+// ---- Ort-Anfragen empfangen (Warteschlange wie bei Notiz-Anfragen) ----
+let placeInviteQueue = [];
+let placeInviteShowing = null;
+
+function enqueuePlaceInvite(inv) {
+  if (!inv) return;
+  if ((placeInviteShowing && placeInviteShowing.id === inv.id) || placeInviteQueue.some((i) => i.id === inv.id)) return;
+  placeInviteQueue.push(inv);
+  showNextPlaceInvite();
+}
+
+function showNextPlaceInvite() {
+  if (placeInviteShowing || !placeInviteQueue.length) return;
+  placeInviteShowing = placeInviteQueue.shift();
+  $('placeInviteText').textContent = t('placeInviteText', {
+    who: placeInviteShowing.from_name || t('someone'),
+    name: (placeInviteShowing.name || '').trim() || '📍'
+  });
+  const q = $('placeInviteMsg');
+  if (placeInviteShowing.message) {
+    q.textContent = '„' + placeInviteShowing.message + '"';
+    q.classList.remove('hidden');
+  } else {
+    q.classList.add('hidden');
+  }
+  $('placeInviteModal').classList.remove('hidden');
+}
+
+function closePlaceInvite() {
+  $('placeInviteModal').classList.add('hidden');
+  placeInviteShowing = null;
+  setTimeout(showNextPlaceInvite, 250);
+}
+
+async function acceptCurrentPlaceInvite() {
+  const inv = placeInviteShowing;
+  if (!inv) return;
+  // Erst benennen ("wie soll der Ort bei dir heißen?"), Vorschlag = Name des Absenders
+  const name = (prompt(t('placeInviteName'), inv.name || '') || '').trim();
+  if (!name) return; // abgebrochen → Anfrage bleibt offen
+  $('placeInviteAccept').disabled = true;
+  try {
+    await NZPlaceInvites.acceptPlaceInvite(inv);
+    const places = getPlaces();
+    places.push({ id: NZ.uid(), name, lat: inv.lat, lng: inv.lng, radius: inv.radius || 150 });
+    savePlaces(places);
+    updateGeoSummary();
+    showToast(t('placeInviteAccepted', { name }));
+    closePlaceInvite();
+  } catch (e) {
+    alert(t('errGeneric') + (e.message || e));
+  } finally {
+    $('placeInviteAccept').disabled = false;
+  }
+}
+
+async function declineCurrentPlaceInvite() {
+  const inv = placeInviteShowing;
+  if (!inv) return;
+  try {
+    await NZPlaceInvites.declinePlaceInvite(inv);
+  } catch {}
+  closePlaceInvite();
+}
+
+// ---- Karte: Orte als Pins mit Status-Farben (rot=dort offen, gelb=Einkaufsliste offen, grün=nichts) ----
+let placesMap = null;
+let placesMapLayers = [];
+
+function placePinColor(p) {
+  const ownOpen = (data.notes || []).reduce(
+    (n, note) => n + (note.subtasks || []).filter((s) => !s.deleted && (s.status || 'todo') !== 'done' && s.place === p.id).length,
+    0
+  );
+  if (ownOpen > 0) return { color: '#ff5c72', label: t('mapPinOwn', { n: ownOpen }) };
+  const shopRe = /einkauf|shopping|shop|kauf|grocer|supermarkt|markt/i;
+  const generalOpen = (data.notes || [])
+    .filter((n) => shopRe.test(n.title || '') || n.pinned)
+    .reduce((n, note) => n + (note.subtasks || []).filter((s) => !s.deleted && (s.status || 'todo') !== 'done' && !s.place).length, 0);
+  if (generalOpen > 0) return { color: '#ffb340', label: t('mapPinGeneral', { n: generalOpen }) };
+  return { color: '#3ad17a', label: t('mapPinDone') };
+}
+
+function openPlacesMap() {
+  const places = getPlaces();
+  if (!places.length) return;
+  $('mapModal').classList.remove('hidden');
+  setTimeout(() => {
+    if (!placesMap) {
+      placesMap = L.map('placesMap', { zoomControl: true });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }).addTo(placesMap);
+    }
+    placesMapLayers.forEach((l) => placesMap.removeLayer(l));
+    placesMapLayers = [];
+    const bounds = [];
+    places.forEach((p) => {
+      const pin = placePinColor(p);
+      const circle = L.circle([p.lat, p.lng], {
+        radius: p.radius || 150,
+        color: pin.color,
+        weight: 1,
+        fillColor: pin.color,
+        fillOpacity: 0.12
+      }).addTo(placesMap);
+      const marker = L.circleMarker([p.lat, p.lng], {
+        radius: 10,
+        color: '#ffffff',
+        weight: 3,
+        fillColor: pin.color,
+        fillOpacity: 1
+      })
+        .addTo(placesMap)
+        .bindPopup(`<b>📍 ${escapeHtml(p.name)}</b><br>${escapeHtml(pin.label)}`);
+      placesMapLayers.push(circle, marker);
+      bounds.push([p.lat, p.lng]);
+    });
+    placesMap.invalidateSize();
+    if (bounds.length === 1) placesMap.setView(bounds[0], 15);
+    else placesMap.fitBounds(bounds, { padding: [40, 40] });
+  }, 60);
 }
 
 // ---- Morgen-Briefing: Einstellungen ----
@@ -3335,6 +3529,19 @@ $('inviteSendBtn').onclick = sendInviteToUser;
 $('inviteClose').onclick = closeInvite;
 $('inviteAccept').onclick = acceptCurrentInvite;
 $('inviteDecline').onclick = declineCurrentInvite;
+// Ort teilen / Ort-Anfragen / Karte
+$('placeInviteAccept').onclick = acceptCurrentPlaceInvite;
+$('placeInviteDecline').onclick = declineCurrentPlaceInvite;
+$('placeInviteClose').onclick = closePlaceInvite;
+$('placeShareClose').onclick = () => $('placeShareModal').classList.add('hidden');
+$('placeShareModal').addEventListener('click', (e) => {
+  if (e.target === $('placeShareModal')) $('placeShareModal').classList.add('hidden');
+});
+$('placesMapBtn').onclick = openPlacesMap;
+$('mapClose').onclick = () => $('mapModal').classList.add('hidden');
+$('mapModal').addEventListener('click', (e) => {
+  if (e.target === $('mapModal')) $('mapModal').classList.add('hidden');
+});
 $('inviteUser').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') sendInviteToUser();
 });
@@ -3378,6 +3585,13 @@ NZStore.ready.then(async () => {
       (await NZInvites.pendingInvites()).forEach(enqueueInvite);
     } catch {}
     NZInvites.onInvites((inv) => enqueueInvite(inv));
+  }
+  // Ort-Anfragen: offene beim Start zeigen + live empfangen
+  if (window.NZPlaceInvites && cloudReady()) {
+    try {
+      (await NZPlaceInvites.pendingPlaceInvites()).forEach(enqueuePlaceInvite);
+    } catch {}
+    NZPlaceInvites.onPlaceInvites((inv) => enqueuePlaceInvite(inv));
   }
   // Falls von iOS abgemeldet, aber E-Mail bekannt → freundlich zum Anmelden auffordern
   const remembered = window.NZAuth && NZAuth.lastEmail ? NZAuth.lastEmail() : null;

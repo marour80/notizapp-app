@@ -619,7 +619,62 @@
     await c.from('friends').delete().eq('owner', uid).eq('friend_uid', friendUid);
   }
 
+  // ---- Ort-Einladungen (Einkaufs-Ort mit Freund teilen) ----
+  async function sendPlaceInvite(toUid, place, message, fromName) {
+    const c = await ensureClient();
+    if (toUid === uid) throw new Error('self');
+    const { error } = await c.from('place_invites').insert({
+      from_uid: uid,
+      from_name: fromName || null,
+      to_uid: toUid,
+      name: place.name || null,
+      message: (message || '').trim() || null,
+      lat: place.lat,
+      lng: place.lng,
+      radius: place.radius || 150,
+      status: 'pending'
+    });
+    if (error) throw error;
+    return true;
+  }
+
+  async function pendingPlaceInvites() {
+    const c = await ensureClient();
+    const { data } = await c
+      .from('place_invites')
+      .select('*')
+      .eq('to_uid', uid)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    return data || [];
+  }
+
+  async function acceptPlaceInvite(invite) {
+    const c = await ensureClient();
+    await c.from('place_invites').update({ status: 'accepted' }).eq('id', invite.id);
+  }
+
+  async function declinePlaceInvite(invite) {
+    const c = await ensureClient();
+    await c.from('place_invites').update({ status: 'declined' }).eq('id', invite.id);
+  }
+
+  function onPlaceInvites(cb) {
+    ensureClient()
+      .then((c) => {
+        c.channel('nz-place-invites')
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'place_invites', filter: 'to_uid=eq.' + uid },
+            (p) => cb(p.new)
+          )
+          .subscribe();
+      })
+      .catch(() => {});
+  }
+
   global.NZProfile = { getMyProfile, setUsername, findUser, cleanUsername };
   global.NZInvites = { sendInvite, pendingInvites, acceptInvite, declineInvite, onInvites };
+  global.NZPlaceInvites = { sendPlaceInvite, pendingPlaceInvites, acceptPlaceInvite, declinePlaceInvite, onPlaceInvites };
   global.NZFriends = { listFriends, addFriend, setFriendAlias, removeFriend };
 })(typeof window !== 'undefined' ? window : globalThis);

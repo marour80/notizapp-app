@@ -13,6 +13,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
   <link rel="stylesheet" href="fonts/manrope.css" />
+  <link rel="stylesheet" href="vendor/leaflet.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -298,7 +299,43 @@
         <p data-i18n="placeLocating">Standort wird ermittelt…</p>
       </div>
       <button id="placeAddBtn" class="primary-btn" data-i18n="placeAdd">📍 Aktuellen Standort speichern</button>
+      <button id="placesMapBtn" class="ghost-btn places-map-btn hidden" data-i18n="mapOpen">🗺 Karte öffnen</button>
       <p id="placesPermHint" class="modal-hint places-perm hidden" data-i18n="placesPermHint">Für Erinnerungen bei geschlossener App bitte in den iOS-Einstellungen den Standort auf „Immer" stellen.</p>
+    </div>
+  </div>
+
+  <!-- Ort mit einem Freund teilen -->
+  <div id="placeShareModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" id="placeShareClose">✕</button>
+      <h2>📍 <span id="placeShareTitle">Ort teilen</span></h2>
+      <label data-i18n="placeShareMsgLabel">Kurze Erklärung für deinen Freund (optional)</label>
+      <textarea id="placeShareMsg" class="sub-edit-text place-share-msg" rows="2" data-i18n-ph="placeShareMsgPh" placeholder="z. B. Der Rewe bei uns um die Ecke"></textarea>
+      <label data-i18n="placeSharePick">An wen? (tippen = senden)</label>
+      <div id="placeShareFriends" class="friend-chips"></div>
+      <div id="placeShareMsgDone" class="invite-msg hidden"></div>
+    </div>
+  </div>
+
+  <!-- Ort-Anfrage beim Empfänger -->
+  <div id="placeInviteModal" class="modal-overlay hidden">
+    <div class="modal">
+      <button class="modal-close" id="placeInviteClose">✕</button>
+      <h2>📍 <span data-i18n="placeInviteTitle">Ort-Anfrage</span></h2>
+      <p id="placeInviteText" class="modal-hint"></p>
+      <p id="placeInviteMsg" class="place-invite-quote hidden"></p>
+      <button id="placeInviteAccept" class="primary-btn" data-i18n="inviteAccept">Annehmen</button>
+      <button id="placeInviteDecline" class="ghost-btn" data-i18n="inviteDecline">Ablehnen</button>
+    </div>
+  </div>
+
+  <!-- Karte: alle Einkaufs-Orte mit Status-Pins -->
+  <div id="mapModal" class="modal-overlay hidden">
+    <div class="modal map-modal">
+      <button class="modal-close" id="mapClose">✕</button>
+      <h2>🗺 <span data-i18n="mapTitle">Deine Einkaufs-Orte</span></h2>
+      <div id="placesMap" class="places-map"></div>
+      <p class="modal-hint map-legend"><span class="dot dot-todo"></span> <span data-i18n="mapLegendOpen">Punkte offen</span> &nbsp; <span class="dot dot-doing"></span> <span data-i18n="mapLegendGeneral">Einkaufsliste offen</span> &nbsp; <span class="dot dot-done"></span> <span data-i18n="mapLegendDone">Nichts zu erledigen</span></p>
     </div>
   </div>
 
@@ -576,6 +613,7 @@
   <script src="core/config.js"></script>
   <script src="vendor/supabase.js"></script>
   <script src="vendor/qrcode.js"></script>
+  <script src="vendor/leaflet.js"></script>
   <script src="core/i18n.js"></script>
   <script src="core/model.js"></script>
   <script src="core/device.js"></script>
