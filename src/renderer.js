@@ -3208,6 +3208,8 @@ $('shareTextBtn').onclick = async () => {
   const note = currentNote();
   if (!note) return;
   const text = noteAsText(note);
+  // Handy-App: natives Teilen-Menü (WhatsApp direkt wählbar) – der Web-Weg fehlt im Android-WebView.
+  if (window.NZNative && (await NZNative.shareText(text))) return;
   try {
     if (navigator.share) {
       await navigator.share({ text });

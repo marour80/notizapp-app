@@ -338,6 +338,19 @@
     return true;
   }
 
+  // ---- System-Teilen-Menü (WhatsApp & Co.) ----
+  // true = natives Teilen-Menü wurde geöffnet; false = Plugin fehlt (Web/Desktop → Fallback).
+  async function shareText(text) {
+    const S = plugin('Share');
+    if (!S || !S.share) return false;
+    try {
+      await S.share({ text });
+    } catch {
+      // Nutzer hat das Teilen-Menü zugemacht → trotzdem behandelt, kein Fallback nötig
+    }
+    return true;
+  }
+
   // ---- Android-Zurück-Knopf ----
   // handler() gibt true zurück, wenn er die Geste behandelt hat (Screen/Modal geschlossen);
   // false = wir sind ganz oben → App in den Hintergrund (statt sie hart zu beenden).
@@ -444,5 +457,5 @@
     });
   }
 
-  global.NZNative = { isNative, onDeepLink, onAppRoute, onAuthCallback, onBackButton, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, initTermActions, updateWidget, geoAvailable, geoRequestPermission, geoAuthStatus, geoCurrentPosition, geoSetPlaces, geoSetSummary, parseCode, plugin, initKeyboard };
+  global.NZNative = { isNative, onDeepLink, onAppRoute, onAuthCallback, onBackButton, shareText, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, initTermActions, updateWidget, geoAvailable, geoRequestPermission, geoAuthStatus, geoCurrentPosition, geoSetPlaces, geoSetSummary, parseCode, plugin, initKeyboard };
 })(typeof window !== 'undefined' ? window : globalThis);
