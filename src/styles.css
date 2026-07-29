@@ -244,6 +244,17 @@ input, textarea, [contenteditable], .body-input, .preview {
   transition: opacity 0.22s ease, transform 0.22s ease;
 }
 .toast.show { opacity: 1; transform: translateY(0); }
+.toast-action {
+  margin-left: 6px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13.5px;
+  padding: 4px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
 .toast .toast-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
 .app-version { text-align: center; font-size: 10.5px; color: var(--text-faint); padding: 8px 0 2px; letter-spacing: 0.3px; }
 
@@ -1728,6 +1739,23 @@ body:not(.settings-open) .settings-screen { display: none; }
 }
 .map-legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; margin-bottom: 0; }
 .dot-shop { background: #ffb340; box-shadow: 0 0 0 3px rgba(255,179,64,0.18); }
+.map-general-hint { margin: 10px 0 0; color: var(--text); }
+
+/* ---- App-eigener Dialog (statt System-confirm/prompt) ---- */
+.nz-dialog { max-width: 340px; }
+.nz-dlg-text { margin: 4px 0 14px; font-size: 15px; line-height: 1.5; white-space: pre-line; }
+.nz-dlg-input {
+  width: 100%;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 16px;
+  padding: 11px 12px;
+  margin-bottom: 14px;
+}
+.nz-dlg-actions { display: flex; gap: 10px; }
+.nz-dlg-actions button { flex: 1; margin: 0; }
 .leaflet-container { font-family: inherit; }
 
 /* ---- Teilaufgaben-Blatt (Name + Ort + Foto) ---- */

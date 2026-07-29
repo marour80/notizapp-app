@@ -1,6 +1,6 @@
 {
   "name": "smartnote",
-  "version": "1.7.29",
+  "version": "1.7.30",
   "description": "Eine coole, einfache Notiz-App für Windows",
   "main": "main.js",
   "scripts": {
@@ -42,6 +42,7 @@
     "@capacitor/browser": "^8.0.3",
     "@capacitor/camera": "^8.2.0",
     "@capacitor/core": "^8.4.0",
+    "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.4.1",
     "@capacitor/keyboard": "^8.0.5",
     "@capacitor/local-notifications": "^8.2.0",

@@ -167,6 +167,37 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ removed }), { headers: { 'Content-Type': 'application/json' } });
     }
 
+    // ---- Anfrage-Push: {mode:'invite-push', kind:'note'|'place', to, who, title} ----
+    // Der Client ruft das direkt nach dem Einfügen einer Einladung/Ort-Anfrage auf,
+    // damit der Empfänger sofort eine Push bekommt (Realtime greift nur bei offener App).
+    if (payload && payload.mode === 'invite-push') {
+      const to = String(payload.to || '');
+      if (!to) return new Response(JSON.stringify({ error: 'to fehlt' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      const who = String(payload.who || '').slice(0, 60) || 'Jemand';
+      const title = String(payload.title || '').slice(0, 80) || 'Ohne Titel';
+      const bodyText =
+        payload.kind === 'place'
+          ? `${who} möchte den Ort „${title}" mit dir teilen 📍`
+          : `${who} möchte „${title}" mit dir teilen – Anfrage in der App öffnen 🔗`;
+      const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const { data: toks } = await supa.from('push_tokens').select('token').eq('device', to);
+      const tokens = (toks || []).map((t: any) => t.token).filter(Boolean);
+      if (!tokens.length) {
+        console.log('notify: INVITE-PUSH kind=' + payload.kind + ' to=' + to + ' → kein Token');
+        return new Response(JSON.stringify({ sent: 0 }), { headers: { 'Content-Type': 'application/json' } });
+      }
+      const sa = JSON.parse(atob(Deno.env.get('FCM_SA_B64')!));
+      const accessToken = await getAccessToken(sa);
+      let sent = 0;
+      for (const tk of tokens) {
+        const r = await sendPush(accessToken, sa.project_id, tk, bodyText, 'invite');
+        if (r.ok) sent++;
+        else console.log('notify: INVITE-PUSH Fehler status=' + r.status + ' ' + r.text.slice(0, 300));
+      }
+      console.log('notify: INVITE-PUSH kind=' + payload.kind + ' to=' + to + ' sent=' + sent + '/' + tokens.length);
+      return new Response(JSON.stringify({ sent }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
     // ---- Debug/Test-Modus: {mode:'push-test', device:'<uuid>'} → Push direkt an dieses Gerät ----
     if (payload && payload.mode === 'push-test') {
       const supa = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);

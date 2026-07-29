@@ -457,5 +457,17 @@
     });
   }
 
-  global.NZNative = { isNative, onDeepLink, onAppRoute, onAuthCallback, onBackButton, shareText, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, initTermActions, updateWidget, geoAvailable, geoRequestPermission, geoAuthStatus, geoCurrentPosition, geoSetPlaces, geoSetSummary, parseCode, plugin, initKeyboard };
+  // Haptik: kurzes taktiles Feedback (nur nativ; im Browser stille No-Op).
+  // kind: 'light' | 'medium' (Impact) | 'success' (Erfolgs-Doppeltick)
+  function haptic(kind) {
+    try {
+      if (!isNative()) return;
+      const H = plugin('Haptics');
+      if (!H) return;
+      if (kind === 'success') H.notification({ type: 'SUCCESS' });
+      else H.impact({ style: kind === 'medium' ? 'MEDIUM' : 'LIGHT' });
+    } catch {}
+  }
+
+  global.NZNative = { isNative, onDeepLink, onAppRoute, onAuthCallback, onBackButton, shareText, scanAvailable, scanQR, cameraAvailable, takePhoto, openUrl, closeBrowser, nativeRecordAvailable, startNativeRecording, stopNativeRecording, cancelNativeRecording, getRecordingLevel, registerPush, remindersAvailable, requestReminderPermission, replaceReminders, initTermActions, updateWidget, geoAvailable, geoRequestPermission, geoAuthStatus, geoCurrentPosition, geoSetPlaces, geoSetSummary, parseCode, plugin, initKeyboard, haptic };
 })(typeof window !== 'undefined' ? window : globalThis);

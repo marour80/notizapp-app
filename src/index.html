@@ -329,13 +329,26 @@
     </div>
   </div>
 
+  <!-- App-eigener Bestätigen/Eingabe-Dialog (ersetzt System-confirm/prompt) -->
+  <div id="nzDialog" class="modal-overlay hidden">
+    <div class="modal nz-dialog">
+      <p id="nzDlgText" class="nz-dlg-text"></p>
+      <input id="nzDlgInput" type="text" class="nz-dlg-input hidden" autocomplete="off" enterkeyhint="done" />
+      <div class="nz-dlg-actions">
+        <button id="nzDlgCancel" class="ghost-btn" data-i18n="cancel">Abbrechen</button>
+        <button id="nzDlgOk" class="primary-btn">OK</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Karte: alle Einkaufs-Orte mit Status-Pins -->
   <div id="mapModal" class="modal-overlay hidden">
     <div class="modal map-modal">
       <button class="modal-close" id="mapClose">✕</button>
       <h2>🗺 <span data-i18n="mapTitle">Deine Einkaufs-Orte</span></h2>
       <div id="placesMap" class="places-map"></div>
-      <p class="modal-hint map-legend"><span class="dot dot-todo"></span> <span data-i18n="mapLegendOpen">Punkte offen</span> &nbsp; <span class="dot dot-shop"></span> <span data-i18n="mapLegendGeneral">Einkaufsliste offen</span> &nbsp; <span class="dot dot-done"></span> <span data-i18n="mapLegendDone">Nichts zu erledigen</span></p>
+      <p id="mapGeneralHint" class="modal-hint map-general-hint hidden"></p>
+      <p class="modal-hint map-legend"><span class="dot dot-todo"></span> <span data-i18n="mapLegendOpen">Punkte hier offen</span> &nbsp; <span class="dot dot-done"></span> <span data-i18n="mapLegendDone">Nichts zu erledigen</span></p>
     </div>
   </div>
 

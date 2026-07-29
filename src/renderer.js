@@ -26,20 +26,83 @@ function statusLabel(s) {
 }
 
 // ---- In-App-Hinweise (Toast) ----
-function showToast(msg, color) {
+function showToast(msg, color, opts) {
   const host = $('toastHost');
   if (!host) return;
   const el = document.createElement('div');
   el.className = 'toast';
   const c = color || 'var(--accent)';
   el.innerHTML = `<span class="toast-dot" style="background:${c}"></span><span>${escapeHtml(msg)}</span>`;
+  // Optionaler Aktions-Knopf (z.B. "Rückgängig" nach dem Löschen)
+  if (opts && opts.action) {
+    const btn = document.createElement('button');
+    btn.className = 'toast-action';
+    btn.textContent = opts.action;
+    btn.onclick = () => {
+      el.classList.remove('show');
+      setTimeout(() => el.remove(), 250);
+      if (opts.onAction) opts.onAction();
+    };
+    el.appendChild(btn);
+  }
   host.appendChild(el);
   requestAnimationFrame(() => el.classList.add('show'));
   setTimeout(() => {
     el.classList.remove('show');
     setTimeout(() => el.remove(), 250);
-  }, 3600);
+  }, (opts && opts.ms) || 3600);
 }
+
+// Kurzes haptisches Feedback (nur nativ, sonst No-Op).
+function buzz(kind) {
+  if (window.NZNative && NZNative.haptic) NZNative.haptic(kind);
+}
+
+// ---- App-eigener Dialog statt System-confirm()/prompt() ----
+// nzConfirm(text, {ok, cancel, danger}) → Promise<boolean>
+// nzPrompt(text, vorbelegung, {ok, placeholder}) → Promise<string|null> (getrimmt; null = abgebrochen)
+let nzDlgResolve = null;
+function nzDialogOpen(opts) {
+  return new Promise((resolve) => {
+    if (nzDlgResolve) nzDlgResolve(null); // Sicherheitsnetz: alten Dialog auflösen
+    nzDlgResolve = resolve;
+    $('nzDlgText').textContent = opts.text || '';
+    const inp = $('nzDlgInput');
+    inp.classList.toggle('hidden', !opts.input);
+    if (opts.input) {
+      inp.value = opts.value || '';
+      inp.placeholder = opts.placeholder || '';
+    }
+    const ok = $('nzDlgOk');
+    ok.textContent = opts.ok || 'OK';
+    ok.classList.toggle('danger-btn', !!opts.danger);
+    ok.classList.toggle('primary-btn', !opts.danger);
+    $('nzDlgCancel').textContent = opts.cancel || t('cancel');
+    $('nzDialog').classList.remove('hidden');
+    if (opts.input) setTimeout(() => { inp.focus(); inp.select(); }, 80);
+  });
+}
+function nzDialogClose(result) {
+  $('nzDialog').classList.add('hidden');
+  const r = nzDlgResolve;
+  nzDlgResolve = null;
+  if (r) r(result);
+}
+async function nzConfirm(text, opts) {
+  return !!(await nzDialogOpen(Object.assign({ text }, opts || {})));
+}
+async function nzPrompt(text, value, opts) {
+  const r = await nzDialogOpen(Object.assign({ text, input: true, value }, opts || {}));
+  return typeof r === 'string' ? r.trim() : null;
+}
+$('nzDlgOk').onclick = () => nzDialogClose($('nzDlgInput').classList.contains('hidden') ? true : $('nzDlgInput').value);
+$('nzDlgCancel').onclick = () => nzDialogClose(null);
+$('nzDialog').addEventListener('click', (e) => {
+  if (e.target === $('nzDialog')) nzDialogClose(null);
+});
+$('nzDlgInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('nzDlgOk').click();
+});
 
 // Wer hat die Notiz zuletzt geändert? Aus den Daten abgeleitet (nicht ich selbst).
 function actorOfNote(note) {
@@ -412,7 +475,7 @@ async function addPlace() {
     $('placeLocating').classList.add('hidden');
     btn.classList.remove('hidden');
     if (!pos) return;
-    const name = (prompt(t('placeNamePrompt'), 'Rewe') || '').trim();
+    const name = (await nzPrompt(t('placeNamePrompt'), 'Rewe')) || '';
     if (!name) return;
     const places = getPlaces();
     places.push({ id: NZ.uid(), name, lat: pos.lat, lng: pos.lng, radius: 150 });
@@ -433,9 +496,21 @@ async function addPlace() {
 // Offene Einkäufe für die Ankunfts-Push zusammenfassen (liest das native Plugin beim Betreten).
 // Teilaufgaben mit zugewiesenem Ort zählen NUR an ihrem Ort; unzugeordnete Punkte der
 // Einkaufsliste zählen überall (Standard-Zusammenfassung).
+// DIE Einkaufsliste finden (eine Notiz): zuerst Titel-Treffer, sonst erste angepinnte
+// Notiz mit offenen, unzugeordneten Punkten. Karte und Ankunfts-Push nutzen dieselbe Wahl.
+function shoppingCandidate() {
+  const shopRe = /einkauf|shopping|shop|kauf|grocer|supermarkt|markt/i;
+  const cands = (data.notes || [])
+    .map((n) => ({
+      n,
+      open: (n.subtasks || []).filter((s) => !s.deleted && (s.status || 'todo') !== 'done' && !s.place).length
+    }))
+    .filter((x) => x.open > 0);
+  return cands.find((x) => shopRe.test(x.n.title || '')) || cands.find((x) => x.n.pinned) || null;
+}
+
 function updateGeoSummary() {
   if (!(window.NZNative && NZNative.geoSetSummary && NZNative.geoAvailable && NZNative.geoAvailable())) return;
-  const shopRe = /einkauf|shopping|shop|kauf|grocer|supermarkt|markt/i;
   const places = getPlaces();
 
   // Ort-zugewiesene offene Punkte über ALLE Notizen einsammeln
@@ -448,13 +523,7 @@ function updateGeoSummary() {
   });
 
   // Unzugeordnete offene Punkte der Einkaufs-/angepinnten Liste (wie bisher)
-  const cands = (data.notes || [])
-    .map((n) => ({
-      n,
-      open: (n.subtasks || []).filter((s) => !s.deleted && (s.status || 'todo') !== 'done' && !s.place).length
-    }))
-    .filter((x) => x.open > 0);
-  const match = cands.find((x) => shopRe.test(x.n.title || '')) || cands.find((x) => x.n.pinned) || null;
+  const match = shoppingCandidate();
 
   const defCount = match ? match.open : 0;
   const defBody = match ? t('placesPushBody', { n: match.open, title: match.n.title || t('untitled') }) : '';
@@ -574,7 +643,7 @@ async function acceptCurrentPlaceInvite() {
   const inv = placeInviteShowing;
   if (!inv) return;
   // Erst benennen ("wie soll der Ort bei dir heißen?"), Vorschlag = Name des Absenders
-  const name = (prompt(t('placeInviteName'), inv.name || '') || '').trim();
+  const name = (await nzPrompt(t('placeInviteName'), inv.name || '')) || '';
   if (!name) return; // abgebrochen → Anfrage bleibt offen
   $('placeInviteAccept').disabled = true;
   try {
@@ -583,6 +652,7 @@ async function acceptCurrentPlaceInvite() {
     places.push({ id: NZ.uid(), name, lat: inv.lat, lng: inv.lng, radius: inv.radius || 150 });
     savePlaces(places);
     updateGeoSummary();
+    buzz('success');
     showToast(t('placeInviteAccepted', { name }));
     closePlaceInvite();
   } catch (e) {
@@ -610,12 +680,9 @@ function placePinColor(p) {
     (n, note) => n + (note.subtasks || []).filter((s) => !s.deleted && (s.status || 'todo') !== 'done' && s.place === p.id).length,
     0
   );
-  if (ownOpen > 0) return { color: '#ff5c72', label: t('mapPinOwn', { n: ownOpen }) };
-  const shopRe = /einkauf|shopping|shop|kauf|grocer|supermarkt|markt/i;
-  const generalOpen = (data.notes || [])
-    .filter((n) => shopRe.test(n.title || '') || n.pinned)
-    .reduce((n, note) => n + (note.subtasks || []).filter((s) => !s.deleted && (s.status || 'todo') !== 'done' && !s.place).length, 0);
-  if (generalOpen > 0) return { color: '#ffb340', label: t('mapPinGeneral', { n: generalOpen }) };
+  if (ownOpen > 0) return { color: '#ff5c72', label: t(ownOpen === 1 ? 'mapPinOwn1' : 'mapPinOwn', { n: ownOpen }) };
+  // Pins zeigen NUR ort-zugewiesene Punkte. Die allgemeine Einkaufsliste (ohne Ort)
+  // erscheint einmal als Hinweis unter der Karte – nicht an jedem Pin.
   return { color: '#3ad17a', label: t('mapPinDone') };
 }
 
@@ -623,6 +690,13 @@ function openPlacesMap() {
   const places = getPlaces();
   if (!places.length) return;
   $('mapModal').classList.remove('hidden');
+  // Allgemeine Einkaufsliste (Punkte ohne Ort) einmal unter der Karte zeigen
+  const gen = shoppingCandidate();
+  const hint = $('mapGeneralHint');
+  if (hint) {
+    hint.textContent = gen ? '🛒 ' + t(gen.open === 1 ? 'mapPinGeneral1' : 'mapPinGeneral', { n: gen.open, title: gen.n.title || t('untitled') }) : '';
+    hint.classList.toggle('hidden', !gen);
+  }
   setTimeout(() => {
     if (!placesMap) {
       placesMap = L.map('placesMap', { zoomControl: true });
@@ -658,6 +732,28 @@ function openPlacesMap() {
     placesMap.invalidateSize();
     if (bounds.length === 1) placesMap.setView(bounds[0], 15);
     else placesMap.fitBounds(bounds, { padding: [40, 40] });
+    // Eigener Standort als blauer Punkt – nur zur Orientierung, ohne die Ansicht zu verschieben
+    (async () => {
+      try {
+        let pos = null;
+        if (window.NZNative && NZNative.geoAvailable && NZNative.geoAvailable()) {
+          pos = await NZNative.geoCurrentPosition();
+        } else if (navigator.geolocation) {
+          pos = await new Promise((res) =>
+            navigator.geolocation.getCurrentPosition(
+              (p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
+              () => res(null),
+              { timeout: 4000 }
+            )
+          );
+        }
+        if (!pos || !placesMap || $('mapModal').classList.contains('hidden')) return;
+        const me = L.circleMarker([pos.lat, pos.lng], { radius: 7, color: '#ffffff', weight: 2, fillColor: '#4c8dff', fillOpacity: 1 })
+          .addTo(placesMap)
+          .bindPopup(escapeHtml(t('mapYou')));
+        placesMapLayers.push(me);
+      } catch {}
+    })();
   }, 60);
 }
 
@@ -799,6 +895,7 @@ function agendaRow(n, d, askDone) {
     doneSwipe.onclick = (e) => {
       e.stopPropagation();
       n.termDone = true; // erledigt → wandert nach "Vergangen"
+      buzz('success');
       n.updatedAt = Date.now();
       persist();
       renderTermine();
@@ -808,6 +905,7 @@ function agendaRow(n, d, askDone) {
     li.querySelector('.agenda-done-btn').onclick = (e) => {
       e.stopPropagation();
       n.termDone = true; // bestätigt → wandert nach "Vergangen"
+      buzz('success');
       n.updatedAt = Date.now();
       persist();
       renderTermine();
@@ -1280,11 +1378,14 @@ function closeEditor() {
 // - Besitzer: löscht für ALLE → klare Warnung.
 // - Mitglied: nur die Teilung VERLASSEN (note_members-Eintrag entfernen), sonst
 //   bringt der nächste Sync die Notiz als Zombie zurück.
-function confirmSharedDelete(note) {
+async function confirmSharedDelete(note) {
   const shared = !!(note.share && note.share.code);
   if (!shared) return true; // nicht geteilt → keine Extra-Warnung nötig
   const isOwner = note.ownedByMe !== false; // lokal erstellte Notizen gelten als eigene
-  return confirm(t(isOwner ? 'deleteSharedOwnerConfirm' : 'deleteSharedMemberConfirm'));
+  return nzConfirm(t(isOwner ? 'deleteSharedOwnerConfirm' : 'deleteSharedMemberConfirm'), {
+    ok: t('delete'),
+    danger: true
+  });
 }
 
 function removeNoteEverywhere(note) {
@@ -1297,25 +1398,51 @@ function removeNoteEverywhere(note) {
   persist();
 }
 
-function deleteNote() {
+// Eigene (ungeteilte) Notiz: sofort löschen, mit "Rückgängig"-Toast statt Nachfrage.
+function deleteWithUndo(note) {
+  const idx = data.notes.findIndex((n) => n.id === note.id);
+  data.notes = data.notes.filter((n) => n.id !== note.id);
+  persist();
+  buzz('light');
+  showToast(t('noteDeletedToast', { title: note.title || t('untitled') }), '#ff5c72', {
+    action: t('undo'),
+    ms: 6000,
+    onAction: () => {
+      data.notes.splice(Math.max(0, Math.min(idx, data.notes.length)), 0, note);
+      persist();
+      renderAll();
+    }
+  });
+}
+
+async function deleteNote() {
   const note = currentNote();
   if (!note) return;
   const shared = !!(note.share && note.share.code);
-  if (shared ? !confirmSharedDelete(note) : !confirm(t('deleteNoteConfirm'))) return;
-  removeNoteEverywhere(note);
+  if (shared) {
+    if (!(await confirmSharedDelete(note))) return;
+    removeNoteEverywhere(note);
+  } else {
+    deleteWithUndo(note);
+  }
   closeEditor();
   renderAll();
 }
 
 // Direkt aus der Liste löschen (per Wischen) – geteilte Notizen fragen nach.
-function deleteNoteById(id) {
+async function deleteNoteById(id) {
   const note = data.notes.find((n) => n.id === id);
   if (!note) return;
-  if (!confirmSharedDelete(note)) {
-    closeAllSwipes();
-    return;
+  const shared = !!(note.share && note.share.code);
+  if (shared) {
+    if (!(await confirmSharedDelete(note))) {
+      closeAllSwipes();
+      return;
+    }
+    removeNoteEverywhere(note);
+  } else {
+    deleteWithUndo(note);
   }
-  removeNoteEverywhere(note);
   if (openSwipedCard) openSwipedCard = null;
   if (activeNoteId === id) closeEditor();
   renderAll();
@@ -1649,6 +1776,7 @@ function cycleSubtask(stId) {
   const st = note.subtasks.find((s) => s.id === stId);
   if (!st) return;
   st.status = STATUS_ORDER[(STATUS_ORDER.indexOf(st.status || 'todo') + 1) % STATUS_ORDER.length];
+  buzz(st.status === 'done' ? 'success' : 'light');
   st.updatedBy = NZDevice.me();
   st.updatedAt = Date.now();
   note.updatedAt = Date.now();
@@ -1956,18 +2084,18 @@ function removePhoto() {
 }
 
 // ---- Folders ----
-function newFolder() {
-  const name = prompt(t('newFolderPrompt'));
-  if (!name || !name.trim()) return;
-  const clean = name.trim();
+async function newFolder() {
+  const name = await nzPrompt(t('newFolderPrompt'), '');
+  if (!name) return;
+  const clean = name;
   if (data.folders.includes(clean)) return;
   data.folders.push(clean);
   persist();
   renderAll();
 }
 
-function deleteFolder(name) {
-  if (!confirm(t('deleteFolderConfirm', { name }))) return;
+async function deleteFolder(name) {
+  if (!(await nzConfirm(t('deleteFolderConfirm', { name }), { ok: t('delete'), danger: true }))) return;
   data.folders = data.folders.filter((f) => f !== name);
   data.notes.forEach((n) => {
     if (n.folder === name) n.folder = '';
@@ -2207,7 +2335,7 @@ async function doShare() {
 async function doUnshare() {
   const note = currentNote();
   if (!note || !cloudReady()) return;
-  if (!confirm(t('stopSharingConfirm'))) return;
+  if (!(await nzConfirm(t('stopSharingConfirm'), { ok: t('stopSharing'), danger: true }))) return;
   try {
     await window.NZShare.unshareNote(note);
     note.shared = false;
@@ -2431,7 +2559,7 @@ async function submitAuth() {
 }
 
 async function signOutAccount() {
-  if (!confirm(t('signOutConfirm'))) return;
+  if (!(await nzConfirm(t('signOutConfirm'), { ok: t('signOut') }))) return;
   await NZAuth.signOutUser();
   location.reload();
 }
@@ -2501,6 +2629,7 @@ async function acceptCurrentInvite() {
     renderAll();
     closeInvite();
     if (noteId) openNote(noteId);
+    buzz('success');
     showToast(t('inviteAcceptedToast', { title: (inv.note_title || '').trim() || t('untitled') }));
   } catch (e) {
     alert(t('errGeneric') + (e.message || e));
@@ -3187,6 +3316,7 @@ function createSimpleNoteFromAI(title, body, when) {
 function confirmVoice() {
   const draft = voiceDraft;
   if (!draft) return;
+  buzz('medium');
   $('voiceModal').classList.add('hidden');
   if (draft.intent === 'edit') {
     // Bestehenden Termin/Notiz ändern – nur die Felder, die die KI neu geliefert hat.
@@ -3267,10 +3397,10 @@ $('themeToggle').onclick = () =>
 if ($('langToggle')) $('langToggle').onclick = toggleLanguage;
 
 titleInput.oninput = scheduleSave;
-folderSelect.onchange = () => {
+folderSelect.onchange = async () => {
   // "+ Neuer Ordner…" gewählt → Namen abfragen, anlegen, dieser Notiz zuweisen
   if (folderSelect.value === '__new') {
-    const name = (prompt(t('newFolderPrompt')) || '').trim();
+    const name = (await nzPrompt(t('newFolderPrompt'), '')) || '';
     if (name && !data.folders.includes(name)) data.folders.push(name);
     renderFolderSelect();
     folderSelect.value = name && data.folders.includes(name) ? name : '';
@@ -3300,11 +3430,11 @@ $('whenClear').onclick = () => {
   updateSimpleNoteUI(note);
   scheduleSave();
 };
-$('whenAddBtn').onclick = () => {
+$('whenAddBtn').onclick = async () => {
   const note = currentNote();
   if (!note) return;
   // Klare Ansage VOR der Umwandlung: die Notiz zieht in den Termine-Tab um.
-  if (!confirm(t('whenConfirmMsg', { title: note.title || t('untitled') }))) return;
+  if (!(await nzConfirm(t('whenConfirmMsg', { title: note.title || t('untitled') }), { ok: t('whenAdd') }))) return;
   const d = new Date();
   d.setHours(d.getHours() + 1, 0, 0, 0);
   const p = (x) => String(x).padStart(2, '0');

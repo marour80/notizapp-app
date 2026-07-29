@@ -515,6 +515,20 @@
     return data || null;
   }
 
+  // Anfrage-Push an den Empfänger anstoßen (Feuer-und-vergessen; Realtime greift
+  // nur bei offener App, die Push holt ihn auch bei gesperrtem Handy ab).
+  function notifyInvitePush(kind, to, who, title) {
+    try {
+      if (!pushOn()) return;
+      const { SUPABASE_URL, SUPABASE_KEY } = cfg();
+      fetch(SUPABASE_URL + '/functions/v1/notify-', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY },
+        body: JSON.stringify({ mode: 'invite-push', kind, to, who, title })
+      }).catch(() => {});
+    } catch {}
+  }
+
   // ---- Einladungen (Anfrage → Annehmen → geteilt) ----
   async function sendInvite(note, toUid, fromName) {
     const c = await ensureClient();
@@ -532,6 +546,7 @@
       status: 'pending'
     });
     if (error) throw error;
+    notifyInvitePush('note', toUid, fromName, note.title || '');
     return true;
   }
 
@@ -635,6 +650,7 @@
       status: 'pending'
     });
     if (error) throw error;
+    notifyInvitePush('place', toUid, fromName, place.name || '');
     return true;
   }
 
