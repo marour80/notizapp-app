@@ -962,15 +962,9 @@ async function fillChoicePhoto() {
   }
 }
 
-// Eingabefeld fokussieren, OHNE dass iOS den Bildschirm hochscrollt (Leiste unter die Statusleiste).
+// Neue Teilaufgabe → öffnet das Teilaufgaben-Blatt (Name + Ort + Foto).
 function focusSubAdd() {
-  const inp = $('subAddInput');
-  if (!inp) return;
-  try {
-    inp.focus({ preventScroll: true });
-  } catch {
-    inp.focus();
-  }
+  openSubEditor(null);
 }
 
 // ---- Polling-Fallback für offene geteilte Notizen ----
@@ -1248,23 +1242,15 @@ function buildSubItem(st, note, noteShared) {
   const actions = isDeleted
     ? `<button class="sub-restore" title="${t('restore')}">↩</button>
        <button class="sub-del" title="${t('deleteForever')}">✕</button>`
-    : `<button class="sub-photo" title="${t(st.photo ? 'photo' : 'addPhoto')}">📷</button>`;
-  const swipeDel = isDeleted ? '' : `<button class="sub-swipe-del" title="${t('deleteSubtask')}">🗑</button>`;
-  // Ort pro Teilaufgabe (nur wenn Einkaufs-Orte existieren): beschrifteter Chip,
-  // der den gewählten Ort direkt anzeigt ("📍 Rewe") bzw. "📍 Ort" als Aufforderung.
-  const places = getPlaces();
-  const placeSel = !isDeleted && places.length
-    ? `<select class="sub-place ${st.place ? 'on' : ''}" title="${t('subPlace')}">
-         ${st.place ? '' : `<option value="" selected>📍 ${t('placeWord')}</option>`}
-         <option value="__clear">${t('noPlace')}</option>
-         ${places.map((p) => `<option value="${p.id}" ${st.place === p.id ? 'selected' : ''}>📍 ${escapeHtml(p.name)}</option>`).join('')}
-       </select>`
     : '';
-  // Karten-Layout: oben Status + Text, darunter Meta-Zeile (Person · Ort · Foto).
-  // So bleibt der Foto-Knopf auch bei langen Namen/Orten immer erreichbar.
+  const swipeDel = isDeleted ? '' : `<button class="sub-swipe-del" title="${t('deleteSubtask')}">🗑</button>`;
+  // Schlanke Zeile: Ort-Menü + Kamera leben jetzt im Teilaufgaben-Blatt (Zeile antippen öffnet es).
+  const places = getPlaces();
+  const chosenPlace = !isDeleted && st.place ? places.find((p) => p.id === st.place) : null;
+  const placeTag = chosenPlace ? `<span class="sub-place-tag">📍 ${escapeHtml(chosenPlace.name)}</span>` : '';
   const metaBits = isDeleted
     ? ''
-    : [noteShared ? whoBadge(note, st) : '', placeSel, st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : '', actions]
+    : [noteShared ? whoBadge(note, st) : '', placeTag, st.photo ? `<img class="sub-thumb" src="${st.photo}" alt="" />` : '']
         .filter(Boolean)
         .join('');
   li.innerHTML = `
@@ -1272,29 +1258,11 @@ function buildSubItem(st, note, noteShared) {
       <div class="sub-inner">
         <div class="sub-main">
           <span class="dot dot-${status}" title="${statusLabel(status)} ${t('clickToCycle')}"></span>
-          <input class="sub-text" type="text" value="" ${readOnly ? 'readonly' : ''} />
+          <span class="sub-text">${escapeHtml(st.text || '')}</span>
           ${isDeleted ? actions : ''}
         </div>
         ${metaBits ? `<div class="sub-meta">${metaBits}</div>` : ''}
       </div>`;
-  const psel = li.querySelector('.sub-place');
-  if (psel) {
-    psel.onchange = () => {
-      const v = psel.value;
-      if (!v) return;
-      // Immer auf dem AKTUELLEN Objekt arbeiten: Nach einem Live-Reload zeigen die
-      // Closure-Referenzen sonst auf eine verwaiste Kopie → Auswahl "passierte nicht".
-      const cur = currentNote();
-      const target = cur && (cur.subtasks || []).find((x) => x.id === st.id);
-      if (!target) return;
-      target.place = v === '__clear' ? null : v;
-      cur.updatedAt = Date.now();
-      persist();
-      renderSubtasks();
-    };
-  }
-  const input = li.querySelector('.sub-text');
-  input.value = st.text || '';
   const thumb = li.querySelector('.sub-thumb');
   if (thumb) thumb.onclick = () => openPhoto(st.id);
   if (isDeleted) {
@@ -1304,24 +1272,10 @@ function buildSubItem(st, note, noteShared) {
   }
   // Punkt wechselt den Status (bei "erledigt" holt es die Aufgabe zurück zum Bearbeiten).
   li.querySelector('.dot').onclick = () => cycleSubtask(st.id);
+  // Zeile antippen → Teilaufgaben-Blatt (Name/Ort/Foto); erledigte bleiben unantastbar.
   if (!readOnly) {
-    input.oninput = () => {
-      st.text = input.value;
-      note.updatedAt = Date.now();
-      scheduleSubSave();
-    };
-    input.onkeydown = (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        focusSubAdd();
-      }
-    };
-    // Leere Teilaufgabe (nur Leerzeichen) beim Verlassen entfernen – leer ist nicht erlaubt.
-    input.onblur = () => {
-      if (!input.value.trim()) purgeSubtask(st.id);
-    };
+    li.querySelector('.sub-text').onclick = () => openSubEditor(st.id);
   }
-  li.querySelector('.sub-photo').onclick = () => pickSubtaskPhoto(st.id);
   li.querySelector('.sub-swipe-del').onclick = () => deleteSubtask(st.id);
   attachSubSwipe(li, li.querySelector('.sub-inner'), st.id); // Wischen deckt roten Lösch-Knopf auf
   return li;
@@ -1564,6 +1518,117 @@ function findSub(stId) {
   return note && (note.subtasks || []).find((s) => s.id === stId);
 }
 
+// ---- Teilaufgaben-Blatt: Name + Ort + Foto in einem eigenen Dialog ----
+// subEdit.photo: undefined = unverändert lassen, null = entfernen, DataURL = neues Foto.
+let subEdit = null; // { stId: string|null, photo: string|null|undefined }
+
+function openSubEditor(stId) {
+  const note = currentNote();
+  if (!note) return;
+  const st = stId ? (note.subtasks || []).find((s) => s.id === stId) : null;
+  subEdit = { stId: st ? st.id : null, photo: undefined };
+  $('subEditTitle').textContent = t(st ? 'subEditEdit' : 'subEditNew');
+  $('subEditSave').textContent = t(st ? 'saveChanges' : 'insertBtn');
+  const ta = $('subEditText');
+  ta.value = st ? st.text || '' : '';
+  // Ort-Auswahl nur zeigen, wenn Einkaufs-Orte existieren
+  const places = getPlaces();
+  const row = $('subEditPlaceRow');
+  if (places.length) {
+    const sel = $('subEditPlace');
+    sel.innerHTML =
+      `<option value="">${t('noPlace')}</option>` +
+      places.map((p) => `<option value="${p.id}">📍 ${escapeHtml(p.name)}</option>`).join('');
+    sel.value = st && st.place ? st.place : '';
+    row.classList.remove('hidden');
+  } else {
+    row.classList.add('hidden');
+  }
+  updateSubEditPhotoUI(st ? st.photo : null);
+  $('subEditModal').classList.remove('hidden');
+  setTimeout(() => {
+    try { ta.focus({ preventScroll: true }); } catch { ta.focus(); }
+  }, 60);
+}
+
+function updateSubEditPhotoUI(photo) {
+  const img = $('subEditPhotoPreview');
+  if (photo) {
+    img.src = photo;
+    img.classList.remove('hidden');
+    $('subEditPhotoRemove').classList.remove('hidden');
+  } else {
+    img.classList.add('hidden');
+    img.removeAttribute('src');
+    $('subEditPhotoRemove').classList.add('hidden');
+  }
+}
+
+function closeSubEditor() {
+  $('subEditModal').classList.add('hidden');
+  subEdit = null;
+}
+
+function saveSubEditor() {
+  const note = currentNote();
+  if (!note || !subEdit) return closeSubEditor();
+  const text = $('subEditText').value.trim();
+  if (!text) return closeSubEditor(); // leer → nichts anlegen/ändern
+  const placeVisible = !$('subEditPlaceRow').classList.contains('hidden');
+  const place = placeVisible ? $('subEditPlace').value || null : undefined;
+  if (!note.subtasks) note.subtasks = [];
+  if (subEdit.stId) {
+    const st = note.subtasks.find((s) => s.id === subEdit.stId);
+    if (st) {
+      st.text = text;
+      if (place !== undefined) st.place = place;
+      if (subEdit.photo !== undefined) st.photo = subEdit.photo;
+      st.updatedBy = NZDevice.me();
+      st.updatedAt = Date.now();
+    }
+  } else {
+    const st = NZ.makeSubtask(text, NZDevice.me());
+    if (place) st.place = place;
+    if (subEdit.photo) st.photo = subEdit.photo;
+    note.subtasks.push(st);
+  }
+  applyAutoStatus(note);
+  note.updatedAt = Date.now();
+  persist();
+  renderSubtasks();
+  renderNoteList();
+  closeSubEditor();
+  const l = $('subList'); // neueste Teilaufgabe sichtbar halten
+  if (l) l.scrollTop = l.scrollHeight;
+}
+
+async function subEditPickPhoto() {
+  // Nativ: Kamera/Galerie-Dialog. Das Foto bleibt im Blatt – gespeichert wird erst bei Einfügen/Speichern.
+  if (window.NZNative && NZNative.cameraAvailable && NZNative.cameraAvailable()) {
+    try {
+      const dataUrl = await NZNative.takePhoto({
+        header: t('photoHeader'),
+        camera: t('takePhoto'),
+        gallery: t('fromGallery'),
+        cancel: t('cancel')
+      });
+      if (dataUrl && subEdit) {
+        subEdit.photo = dataUrl;
+        updateSubEditPhotoUI(dataUrl);
+      }
+    } catch (e) {
+      const msg = (e && e.message) || '';
+      if (!/cancel/i.test(msg) && msg !== 'no-camera') alert(t('photoFailed') + msg);
+    }
+    return;
+  }
+  // Web/Desktop: Datei-Dialog – onSubPhotoChosen erkennt am Marker, dass das Blatt das Ziel ist.
+  photoTargetId = '__sheet';
+  const inp = $('subPhotoInput');
+  inp.value = '';
+  inp.click();
+}
+
 async function pickSubtaskPhoto(stId) {
   photoTargetId = stId;
   // Handy-App: nativer Dialog „Foto aufnehmen / Aus Galerie".
@@ -1601,7 +1666,21 @@ function storeSubtaskPhoto(stId, dataUrl) {
 }
 
 async function onSubPhotoChosen(file) {
-  if (!file || !findSub(photoTargetId)) return;
+  if (!file) return;
+  // Datei-Auswahl aus dem Teilaufgaben-Blatt → bleibt im Blatt (erst bei Speichern übernommen)
+  if (photoTargetId === '__sheet') {
+    try {
+      const dataUrl = await downscaleImage(file, 900, 0.5);
+      if (subEdit) {
+        subEdit.photo = dataUrl;
+        updateSubEditPhotoUI(dataUrl);
+      }
+    } catch (e) {
+      alert(t('photoFailed') + (e.message || e));
+    }
+    return;
+  }
+  if (!findSub(photoTargetId)) return;
   try {
     storeSubtaskPhoto(photoTargetId, await downscaleImage(file, 900, 0.5));
   } catch (e) {
@@ -3018,18 +3097,37 @@ $('searchInput').oninput = (e) => {
   renderNoteList();
 };
 
+// Die "Neue Teilaufgabe…"-Zeile ist jetzt nur noch der Öffner fürs Teilaufgaben-Blatt.
 function submitSubtask() {
-  const inp = $('subAddInput');
-  addSubtask(inp.value);
-  inp.value = '';
-  focusSubAdd(); // gleich die naechste eingeben koennen – ohne iOS-Hochscrollen (preventScroll)
-  const l = $('subList'); // neueste Teilaufgabe sichtbar halten (oberhalb der Tastatur)
-  if (l) l.scrollTop = l.scrollHeight;
+  openSubEditor(null);
 }
-$('subAddInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') submitSubtask();
+// Die Eingabe-Zeile tippt man nur an – das eigentliche Eingeben passiert im Blatt.
+$('subAddInput').readOnly = true;
+$('subAddInput').onclick = () => openSubEditor(null);
+$('subAddInput').addEventListener('focus', (e) => {
+  e.target.blur(); // keine Tastatur für die Platzhalter-Zeile
+  openSubEditor(null);
 });
 $('subAddBtn').onclick = submitSubtask;
+
+// Teilaufgaben-Blatt: Speichern/Abbrechen/Foto
+$('subEditSave').onclick = saveSubEditor;
+$('subEditCancel').onclick = closeSubEditor;
+$('subEditClose').onclick = closeSubEditor;
+$('subEditPhotoBtn').onclick = subEditPickPhoto;
+$('subEditPhotoRemove').onclick = () => {
+  if (subEdit) subEdit.photo = null;
+  updateSubEditPhotoUI(null);
+};
+$('subEditText').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    saveSubEditor();
+  }
+});
+$('subEditModal').addEventListener('click', (e) => {
+  if (e.target === $('subEditModal')) closeSubEditor();
+});
 
 // Foto pro Teilaufgabe
 $('subPhotoInput').onchange = (e) => onSubPhotoChosen(e.target.files && e.target.files[0]);

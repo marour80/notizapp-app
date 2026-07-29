@@ -334,6 +334,30 @@
     </div>
   </div>
 
+  <!-- Teilaufgabe anlegen/bearbeiten: eigenes Blatt mit Name, Ort und Foto -->
+  <div id="subEditModal" class="modal-overlay hidden">
+    <div class="modal sub-edit">
+      <button class="modal-close" id="subEditClose">✕</button>
+      <h2 id="subEditTitle" data-i18n="subEditNew">Neue Teilaufgabe</h2>
+      <textarea id="subEditText" class="sub-edit-text" rows="2" data-i18n-ph="newSubtask" placeholder="Neue Teilaufgabe…" enterkeyhint="done"></textarea>
+      <div id="subEditPlaceRow" class="sub-edit-row hidden">
+        <label data-i18n="subPlace">Ort</label>
+        <select id="subEditPlace" class="folder-select"></select>
+      </div>
+      <div class="sub-edit-row">
+        <img id="subEditPhotoPreview" class="sub-edit-photo hidden" alt="" />
+        <div class="sub-edit-photo-btns">
+          <button id="subEditPhotoBtn" class="ghost-btn">📷 <span data-i18n="addPhoto">Foto hinzufügen</span></button>
+          <button id="subEditPhotoRemove" class="ghost-btn danger hidden" data-i18n="removePhoto">Foto entfernen</button>
+        </div>
+      </div>
+      <div class="sub-edit-actions">
+        <button id="subEditCancel" class="ghost-btn" data-i18n="cancel">Abbrechen</button>
+        <button id="subEditSave" class="primary-btn" data-i18n="insertBtn">Einfügen</button>
+      </div>
+    </div>
+  </div>
+
   <div id="shareModal" class="modal-overlay hidden">
     <div class="modal">
       <button class="modal-close" id="shareClose">✕</button>

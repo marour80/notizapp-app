@@ -779,16 +779,27 @@ input, textarea, [contenteditable], .body-input, .preview {
   right: -14px;
 }
 .sub-item .dot:hover { transform: scale(1.2); }
-.sub-item input.sub-text {
+.sub-item .sub-text {
   flex: 1;
-  background: none;
-  border: none;
+  min-width: 0;
   color: var(--text);
   font-size: 14px;
-  outline: none;
+  line-height: 1.45;
   padding: 2px 0;
+  cursor: pointer; /* Antippen öffnet das Teilaufgaben-Blatt */
+  overflow-wrap: anywhere;
 }
-.sub-item.done input.sub-text { color: var(--text-faint); text-decoration: line-through; }
+.sub-item.done .sub-text { color: var(--text-faint); text-decoration: line-through; cursor: default; }
+/* Ort-Anzeige in der Zeile (nur Anzeige – geändert wird im Teilaufgaben-Blatt) */
+.sub-place-tag {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  border-radius: 11px;
+  padding: 2px 8px;
+}
 .sub-item .sub-del {
   background: none;
   border: none;
@@ -1692,6 +1703,49 @@ body:not(.settings-open) .settings-screen { display: none; }
 .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
 .copy-btn.copied { color: #3ad17a; border-color: #3ad17a; }
 
+/* ---- Teilaufgaben-Blatt (Name + Ort + Foto) ---- */
+.sub-edit-text {
+  width: 100%;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.5;
+  padding: 12px;
+  min-height: 74px;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+  margin-bottom: 12px;
+}
+.sub-edit-text:focus { border-color: var(--accent); }
+.sub-edit-row { margin-bottom: 12px; }
+.sub-edit-row .folder-select { width: 100%; }
+.sub-edit-photo {
+  display: block;
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.sub-edit-photo-btns { display: flex; gap: 8px; }
+.ghost-btn {
+  flex: 1;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 11px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.ghost-btn:hover { border-color: var(--accent); }
+.ghost-btn.danger { color: var(--danger); }
+.sub-edit-actions { display: flex; gap: 10px; margin-top: 4px; }
+.sub-edit-actions .primary-btn { flex: 1.4; width: auto; }
+.sub-edit-actions .ghost-btn { flex: 1; }
+
 .qr-wrap {
   display: flex;
   justify-content: center;
@@ -1974,7 +2028,7 @@ body:not(.settings-open) .settings-screen { display: none; }
   .search-box input,
   .tags-input,
   .folder-select,
-  .sub-item input.sub-text,
+  .sub-item .sub-text { font-size: 15px; }
   .body-input,
   .copy-row input { font-size: 16px; }
   .status-row { flex-wrap: wrap; }
