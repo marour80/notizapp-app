@@ -1,6 +1,6 @@
 {
   "name": "smartnote",
-  "version": "1.7.26",
+  "version": "1.7.27",
   "description": "Eine coole, einfache Notiz-App für Windows",
   "main": "main.js",
   "scripts": {
