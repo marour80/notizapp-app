@@ -3199,9 +3199,10 @@ function noteAsText(n) {
   const lines = [n.title || t('untitled')];
   if (n.when) lines.push('📅 ' + formatWhen(n.when));
   if (n.body && n.body.trim()) lines.push(n.body.trim());
+  // Nur OFFENE Punkte mitschicken – Erledigtes interessiert den Empfänger nicht.
   (n.subtasks || [])
-    .filter((s) => !s.deleted)
-    .forEach((s) => lines.push(((s.status || 'todo') === 'done' ? '✅ ' : '⬜ ') + s.text));
+    .filter((s) => !s.deleted && (s.status || 'todo') !== 'done')
+    .forEach((s) => lines.push('⬜ ' + s.text));
   return lines.join('\n');
 }
 $('shareTextBtn').onclick = async () => {
