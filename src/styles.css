@@ -1727,6 +1727,7 @@ body:not(.settings-open) .settings-screen { display: none; }
   background: var(--bg-3);
 }
 .map-legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; margin-bottom: 0; }
+.dot-shop { background: #ffb340; box-shadow: 0 0 0 3px rgba(255,179,64,0.18); }
 .leaflet-container { font-family: inherit; }
 
 /* ---- Teilaufgaben-Blatt (Name + Ort + Foto) ---- */
