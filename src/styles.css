@@ -2061,6 +2061,13 @@ body:not(.settings-open) .settings-screen { display: none; }
   /* Tastatur offen: Editor endet ueber der Tastatur – Kopf bleibt fix, nur die Teilaufgaben-Liste scrollt,
      Eingabefeld bleibt sichtbar. --kb-height kommt vom Keyboard-Plugin (NZNative.initKeyboard). */
   body.kb-open .editor-panel { bottom: var(--kb-height, 0px); }
+  /* Modals (z.B. Teilaufgaben-Blatt) zentrieren sich bei offener iOS-Tastatur nur noch
+     im SICHTBAREN Bereich darüber – sonst verschwinden die Knöpfe hinter der Tastatur. */
+  body.kb-open .modal-overlay { bottom: var(--kb-height, 0px); }
+  body.kb-open .modal-overlay .modal {
+    max-height: calc(100vh - var(--kb-height, 0px) - 24px);
+    overflow-y: auto;
+  }
 
   .mobile-only { display: inline-flex; }
   /* Eingabefelder ≥16px → iOS zoomt beim Antippen nicht hinein */
